@@ -2,6 +2,10 @@
 
 package nested
 
+import (
+	"github.com/bobcob7/sudo-gen/examples/nested/duration"
+)
+
 func (c *Config) ApplyPartial(p *ConfigPartial) {
 	if c == nil || p == nil {
 		return
@@ -40,6 +44,28 @@ func (c *Job) ApplyPartial(p *JobPartial) {
 	if p.Location != nil {
 		c.Location = *p.Location
 	}
+	if p.Tenure != nil {
+		if c.Tenure == nil {
+			c.Tenure = &duration.Timestamp{}
+		}
+		applyDurationTimestampPartial(c.Tenure, p.Tenure)
+	}
+}
+
+// applyDurationTimestampPartial applies a partial update to a duration.Timestamp.
+func applyDurationTimestampPartial(c *duration.Timestamp, p *DurationTimestampPartial) {
+	if c == nil || p == nil {
+		return
+	}
+	if p.Minutes != nil {
+		c.Minutes = *p.Minutes
+	}
+	if p.Hours != nil {
+		c.Hours = *p.Hours
+	}
+	if p.Days != nil {
+		c.Days = *p.Days
+	}
 }
 
 func (c *Home) ApplyPartial(p *HomePartial) {
@@ -54,5 +80,8 @@ func (c *Home) ApplyPartial(p *HomePartial) {
 	}
 	if p.ZipCode != nil {
 		c.ZipCode = *p.ZipCode
+	}
+	if p.Age != nil {
+		c.Age = *p.Age
 	}
 }

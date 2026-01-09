@@ -247,32 +247,150 @@ func FindTypeAfterLine(filename string, lineNum int) (string, error) {
 
 // FindNestedStructs finds all struct types referenced by the given struct.
 // It searches all .go files in the directory to find nested types.
+// It also finds external package structs and marks them appropriately.
 func FindNestedStructs(dir, filename string, info *StructInfo) ([]*StructInfo, error) {
 	var nested []*StructInfo
 	seen := make(map[string]bool, len(info.Fields))
 	seen[info.Name] = true
+
+	// Build import path map from all collected imports
+	importPaths := make(map[string]string)
+	for _, imp := range info.Imports {
+		pkgName := imp.Alias
+		if pkgName == "" {
+			pkgName = filepath.Base(imp.Path)
+		}
+		importPaths[pkgName] = imp.Path
+	}
+
 	for _, field := range info.Fields {
-		typeName := field.StructTypeName
-		if typeName == "" || field.TypePkg != "" || seen[typeName] {
+		// Handle local package structs
+		if field.StructTypeName != "" && field.TypePkg == "" && !seen[field.StructTypeName] {
+			nestedInfo, err := FindStructInPackage(dir, field.StructTypeName)
+			if err != nil {
+				continue // Type might be external or not found
+			}
+			seen[field.StructTypeName] = true
+			nested = append(nested, nestedInfo)
+			subNested, err := FindNestedStructs(dir, "", nestedInfo)
+			if err == nil {
+				for _, sub := range subNested {
+					if !seen[sub.Name] {
+						seen[sub.Name] = true
+						nested = append(nested, sub)
+					}
+				}
+			}
 			continue
 		}
-		nestedInfo, err := FindStructInPackage(dir, typeName)
-		if err != nil {
-			continue // Type might be external or not found
+
+		// Handle external package structs
+		if field.TypePkg != "" && field.IsStruct {
+			key := field.TypePkg + "." + field.TypeName
+			if seen[key] {
+				continue
+			}
+			importPath := importPaths[field.TypePkg]
+			if importPath == "" {
+				continue
+			}
+			// Try to find and parse the external struct
+			extInfo, err := FindExternalStruct(dir, importPath, field.TypeName)
+			if err != nil {
+				continue // External struct not parseable
+			}
+			seen[key] = true
+			nested = append(nested, extInfo)
 		}
-		seen[typeName] = true
-		nested = append(nested, nestedInfo)
-		subNested, err := FindNestedStructs(dir, "", nestedInfo)
-		if err == nil {
-			for _, sub := range subNested {
-				if !seen[sub.Name] {
-					seen[sub.Name] = true
-					nested = append(nested, sub)
+	}
+	return nested, nil
+}
+
+// FindExternalStruct finds a struct type in an external package.
+// It resolves the import path relative to the source directory.
+func FindExternalStruct(sourceDir, importPath, typeName string) (*StructInfo, error) {
+	// Resolve the external package directory
+	// First try relative to current module
+	extDir := resolveImportPath(sourceDir, importPath)
+	if extDir == "" {
+		return nil, fmt.Errorf("cannot resolve import path: %s", importPath)
+	}
+
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, extDir, func(fi os.FileInfo) bool {
+		return !strings.HasSuffix(fi.Name(), "_test.go")
+	}, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("parsing external package: %w", err)
+	}
+
+	for _, pkg := range pkgs {
+		for _, f := range pkg.Files {
+			imports := collectImports(f)
+			for _, decl := range f.Decls {
+				genDecl, ok := decl.(*ast.GenDecl)
+				if !ok || genDecl.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range genDecl.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if !ok || typeSpec.Name.Name != typeName {
+						continue
+					}
+					structType, ok := typeSpec.Type.(*ast.StructType)
+					if !ok {
+						continue // Not a struct (could be type alias)
+					}
+					fields := parseStructFields(structType, imports)
+					return &StructInfo{
+						Name:       typeSpec.Name.Name,
+						Fields:     fields,
+						Imports:    imports,
+						Package:    pkg.Name,
+						ImportPath: importPath,
+					}, nil
 				}
 			}
 		}
 	}
-	return nested, nil
+	return nil, fmt.Errorf("type %s not found in package %s", typeName, importPath)
+}
+
+// resolveImportPath resolves an import path to a directory path.
+func resolveImportPath(sourceDir, importPath string) string {
+	// Walk up from sourceDir to find go.mod
+	dir := sourceDir
+	for {
+		modFile := filepath.Join(dir, "go.mod")
+		if _, err := os.Stat(modFile); err == nil {
+			// Found go.mod, read the module path
+			content, err := os.ReadFile(modFile)
+			if err != nil {
+				return ""
+			}
+			lines := strings.Split(string(content), "\n")
+			for _, line := range lines {
+				line = strings.TrimSpace(line)
+				if strings.HasPrefix(line, "module ") {
+					modulePath := strings.TrimPrefix(line, "module ")
+					modulePath = strings.TrimSpace(modulePath)
+					// Check if importPath starts with modulePath
+					if strings.HasPrefix(importPath, modulePath) {
+						relPath := strings.TrimPrefix(importPath, modulePath)
+						relPath = strings.TrimPrefix(relPath, "/")
+						return filepath.Join(dir, relPath)
+					}
+				}
+			}
+			break
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	return ""
 }
 
 // FindStructInPackage searches all .go files in the directory for a struct type.

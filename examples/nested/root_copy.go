@@ -31,6 +31,10 @@ func (c *Job) Copy() *Job {
 	dst.Title = c.Title
 	dst.Company = c.Company
 	dst.Location = c.Location
+	if c.Tenure != nil {
+		v := *c.Tenure
+		dst.Tenure = &v
+	}
 	return dst
 }
 
@@ -42,5 +46,6 @@ func (c *Home) Copy() *Home {
 	dst.Address = c.Address
 	dst.City = c.City
 	dst.ZipCode = c.ZipCode
+	dst.Age = c.Age
 	return dst
 }

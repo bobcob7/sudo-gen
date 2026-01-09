@@ -9,6 +9,8 @@ type StructInfo struct {
 	Fields     []FieldInfo
 	Imports    []ImportInfo
 	SourceFile string // The file where this struct was found (for nested structs)
+	Package    string // Package name if this is an external package struct (e.g., "duration")
+	ImportPath string // Full import path for external package structs
 }
 
 // FieldInfo holds information about a struct field.

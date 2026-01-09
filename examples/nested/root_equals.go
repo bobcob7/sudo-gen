@@ -50,6 +50,12 @@ func (c *Job) Equal(other *Job) bool {
 	if c.Location != other.Location {
 		return false
 	}
+	if (c.Tenure == nil) != (other.Tenure == nil) {
+		return false
+	}
+	if c.Tenure != nil && *c.Tenure != *other.Tenure {
+		return false
+	}
 	return true
 }
 
@@ -68,6 +74,9 @@ func (c *Home) Equal(other *Home) bool {
 		return false
 	}
 	if c.ZipCode != other.ZipCode {
+		return false
+	}
+	if c.Age != other.Age {
 		return false
 	}
 	return true

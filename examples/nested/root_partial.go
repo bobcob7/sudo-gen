@@ -3,6 +3,7 @@
 package nested
 
 import (
+	"github.com/bobcob7/sudo-gen/examples/nested/duration"
 	"time"
 )
 
@@ -15,13 +16,21 @@ type ConfigPartial struct {
 }
 
 type JobPartial struct {
-	Title    *string `json:"title,omitempty"`
-	Company  *string `json:"company,omitempty"`
-	Location *string `json:"location,omitempty"`
+	Title    *string                   `json:"title,omitempty"`
+	Company  *string                   `json:"company,omitempty"`
+	Location *string                   `json:"location,omitempty"`
+	Tenure   *DurationTimestampPartial `json:"tenure,omitempty"`
+}
+
+type DurationTimestampPartial struct {
+	Minutes *int `json:"minutes,omitempty"`
+	Hours   *int `json:"hours,omitempty"`
+	Days    *int `json:"days,omitempty"`
 }
 
 type HomePartial struct {
 	Address *string `json:"address,omitempty"`
 	City    *string `json:"city,omitempty"`
 	ZipCode *string `json:"zip_code,omitempty"`
+	Age     *duration.Duration
 }

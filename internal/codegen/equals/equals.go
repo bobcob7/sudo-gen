@@ -37,7 +37,13 @@ func (s *Subtool) Run(cfg codegen.GeneratorConfig) error {
 	if err != nil {
 		return fmt.Errorf("finding nested structs: %w", err)
 	}
-	allStructs := append([]*codegen.StructInfo{info}, nested...)
+	// Filter out external package structs - we can't add methods to them
+	allStructs := []*codegen.StructInfo{info}
+	for _, st := range nested {
+		if st.Package == "" {
+			allStructs = append(allStructs, st)
+		}
+	}
 	return generateEqualsFile(cfg, allStructs, methodName)
 }
 
