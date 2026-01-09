@@ -5,6 +5,7 @@ package nested
 import (
 	"encoding/json"
 	"testing"
+	"time"
 )
 
 func configPtr[T any](v T) *T {
@@ -127,6 +128,36 @@ func TestConfigLayerBrokerSubscribeJobsSlice(t *testing.T) {
 	}
 }
 
+func TestConfigLayerBrokerSubscribeOtherHomeStruct(t *testing.T) {
+	broker := NewConfigLayerBroker(&Config{OtherHome: &Home{}})
+	var callCount int
+	unsub := broker.SubscribeOtherHome(func(v *Home) {
+		callCount++
+	})
+	defer unsub()
+	if callCount != 1 {
+		t.Fatalf("expected 1 initial callback, got %d", callCount)
+	}
+}
+
+func TestConfigLayerBrokerSubscribeCreatedAtTime(t *testing.T) {
+	now := time.Now()
+	broker := NewConfigLayerBroker(&Config{CreatedAt: now})
+	var updates []time.Time
+	unsub := broker.SubscribeCreatedAt(func(v time.Time) {
+		updates = append(updates, v)
+	})
+	defer unsub()
+	if len(updates) != 1 || !updates[0].Equal(now) {
+		t.Fatalf("expected initial callback with current time, got %v", updates)
+	}
+	later := now.Add(time.Hour)
+	broker.Layer().Set(&ConfigPartial{CreatedAt: &later})
+	if len(updates) != 2 || !updates[1].Equal(later) {
+		t.Fatalf("expected update callback with later time, got %v", updates)
+	}
+}
+
 func TestConfigLayerBrokerMarshalJSON(t *testing.T) {
 	broker := NewConfigLayerBroker(nil)
 	layer := broker.Layer()
@@ -201,5 +232,32 @@ func TestConfigLayerBrokerSetPointerFields(t *testing.T) {
 	cfg := broker.Get()
 	if cfg == nil {
 		t.Fatal("Get() returned nil after setting fields")
+	}
+}
+
+func TestConfigLayerBrokerSetNestedStructOtherHome(t *testing.T) {
+	broker := NewConfigLayerBroker(nil)
+	layer := broker.Layer()
+	partial := &ConfigPartial{
+		OtherHome: &HomePartial{},
+	}
+	layer.Set(partial)
+	cfg := broker.Get()
+	if cfg == nil {
+		t.Fatal("Get() returned nil after setting nested struct")
+	}
+}
+
+func TestConfigLayerBrokerSetTimeFields(t *testing.T) {
+	broker := NewConfigLayerBroker(nil)
+	layer := broker.Layer()
+	now := time.Now()
+	partial := &ConfigPartial{}
+	partial.CreatedAt = &now
+
+	layer.Set(partial)
+	cfg := broker.Get()
+	if cfg == nil {
+		t.Fatal("Get() returned nil after setting time fields")
 	}
 }

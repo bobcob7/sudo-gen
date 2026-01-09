@@ -77,6 +77,27 @@ func TestConfigCopy_JobsSliceIndependence(t *testing.T) {
 	}
 }
 
+func TestConfigCopy_OtherHomeNestedNil(t *testing.T) {
+	c := &Config{}
+	got := c.Copy()
+	if got.OtherHome != nil {
+		t.Error("nil nested struct should remain nil after copy")
+	}
+}
+
+func TestConfigCopy_OtherHomeNestedIndependence(t *testing.T) {
+	c := &Config{
+		OtherHome: &Home{},
+	}
+	got := c.Copy()
+	if got.OtherHome == nil {
+		t.Fatal("expected nested struct to be copied")
+	}
+	if got.OtherHome == c.OtherHome {
+		t.Error("nested struct should be a different pointer")
+	}
+}
+
 func TestJobCopyNil(t *testing.T) {
 	var c *Job
 	got := c.Copy()

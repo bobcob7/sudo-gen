@@ -2,10 +2,16 @@
 
 package nested
 
+import (
+	"time"
+)
+
 type ConfigPartial struct {
-	Name *string      `json:"name,omitempty"`
-	Jobs []Job        `json:"jobs,omitempty"`
-	Home *HomePartial `json:"home,omitempty"`
+	Name      *string      `json:"name,omitempty"`
+	Jobs      []Job        `json:"jobs,omitempty"`
+	Home      *HomePartial `json:"home,omitempty"`
+	OtherHome *HomePartial `json:"home,omitempty"`
+	CreatedAt *time.Time   `json:"created_at,omitempty"`
 }
 
 type JobPartial struct {

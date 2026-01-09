@@ -75,18 +75,21 @@ import (
 	"encoding/json"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // ConfigLayerBroker provides thread-safe access to Config with ordered layer updates and subscriptions.
 type ConfigLayerBroker struct {
-	base      *Config
-	config    atomic.Pointer[Config]
-	mu        sync.Mutex // protects subscribers, layers, and serializes writes
-	nextSubID int
-	layers    []*ConfigLayer
-	subsName  map[int]func(string)
-	subsJobs  map[int]func([]Job)
-	subsHome  map[int]func(Home)
+	base          *Config
+	config        atomic.Pointer[Config]
+	mu            sync.Mutex // protects subscribers, layers, and serializes writes
+	nextSubID     int
+	layers        []*ConfigLayer
+	subsName      map[int]func(string)
+	subsJobs      map[int]func([]Job)
+	subsHome      map[int]func(Home)
+	subsOtherHome map[int]func(*Home)
+	subsCreatedAt map[int]func(time.Time)
 }
 
 // NewConfigLayerBroker creates a new LayerBroker wrapping the given config.
@@ -96,10 +99,12 @@ func NewConfigLayerBroker(cfg *Config) *ConfigLayerBroker {
 		cfg = &Config{}
 	}
 	b := &ConfigLayerBroker{
-		base:     cfg.Copy(),
-		subsName: make(map[int]func(string)),
-		subsJobs: make(map[int]func([]Job)),
-		subsHome: make(map[int]func(Home)),
+		base:          cfg.Copy(),
+		subsName:      make(map[int]func(string)),
+		subsJobs:      make(map[int]func([]Job)),
+		subsHome:      make(map[int]func(Home)),
+		subsOtherHome: make(map[int]func(*Home)),
+		subsCreatedAt: make(map[int]func(time.Time)),
 	}
 	b.config.Store(cfg.Copy())
 	return b
@@ -178,6 +183,46 @@ func (b *ConfigLayerBroker) SubscribeHome(callback func(Home)) func() {
 	}
 }
 
+// SubscribeOtherHome subscribes to changes on OtherHome.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (b *ConfigLayerBroker) SubscribeOtherHome(callback func(*Home)) func() {
+	b.mu.Lock()
+	id := b.nextSubID
+	b.nextSubID++
+	b.subsOtherHome[id] = callback
+	v := b.config.Load().OtherHome
+	b.mu.Unlock()
+	if v != nil {
+		callback(v)
+	}
+	return func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		delete(b.subsOtherHome, id)
+	}
+}
+
+// SubscribeCreatedAt subscribes to changes on CreatedAt.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (b *ConfigLayerBroker) SubscribeCreatedAt(callback func(time.Time)) func() {
+	b.mu.Lock()
+	id := b.nextSubID
+	b.nextSubID++
+	b.subsCreatedAt[id] = callback
+	v := b.config.Load().CreatedAt
+	b.mu.Unlock()
+	if !v.IsZero() {
+		callback(v)
+	}
+	return func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		delete(b.subsCreatedAt, id)
+	}
+}
+
 // ConfigLayer applies partial updates to the LayerBroker.
 type ConfigLayer struct {
 	broker  *ConfigLayerBroker
@@ -213,6 +258,11 @@ func (l *ConfigLayer) Set(p *ConfigPartial) {
 			cb(new)
 		}
 	}
+	if old, new := oldCfg.CreatedAt, newCfg.CreatedAt; !configEqualCreatedAt(old, new) {
+		for _, cb := range l.broker.subsCreatedAt {
+			cb(new)
+		}
+	}
 	l.broker.config.Store(newCfg)
 }
 func configEqualName(a, b string) bool {
@@ -232,6 +282,9 @@ func configEqualJobs(a, b []Job) bool {
 func configEqualHome(a, b Home) bool {
 	return a.Equal(&b)
 }
+func configEqualCreatedAt(a, b time.Time) bool {
+	return a.Equal(b)
+}
 
 // mergePartial merges the given partial into the layer's accumulated partial.
 func (l *ConfigLayer) mergePartial(p *ConfigPartial) {
@@ -243,6 +296,12 @@ func (l *ConfigLayer) mergePartial(p *ConfigPartial) {
 	}
 	if p.Home != nil {
 		l.partial.Home = p.Home
+	}
+	if p.OtherHome != nil {
+		l.partial.OtherHome = p.OtherHome
+	}
+	if p.CreatedAt != nil {
+		l.partial.CreatedAt = p.CreatedAt
 	}
 }
 

@@ -24,6 +24,12 @@ func (c *Config) Equal(other *Config) bool {
 	if !c.Home.Equal(&other.Home) {
 		return false
 	}
+	if !c.OtherHome.Equal(other.OtherHome) {
+		return false
+	}
+	if !c.CreatedAt.Equal(other.CreatedAt) {
+		return false
+	}
 	return true
 }
 

@@ -5,9 +5,10 @@ import "go/ast"
 
 // StructInfo holds information about a parsed struct type.
 type StructInfo struct {
-	Name    string
-	Fields  []FieldInfo
-	Imports []ImportInfo
+	Name       string
+	Fields     []FieldInfo
+	Imports    []ImportInfo
+	SourceFile string // The file where this struct was found (for nested structs)
 }
 
 // FieldInfo holds information about a struct field.

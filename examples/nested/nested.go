@@ -1,12 +1,5 @@
 package nested
 
-//go:generate go run ../../../sudo-gen layerbroker -tests -json
-type Config struct {
-	Name string `json:"name,omitempty"`
-	Jobs []Job  `json:"jobs,omitempty"`
-	Home Home   `json:"home,omitempty"`
-}
-
 type Job struct {
 	Title    string `json:"title,omitempty"`
 	Company  string `json:"company,omitempty"`

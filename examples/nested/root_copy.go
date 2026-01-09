@@ -16,6 +16,10 @@ func (c *Config) Copy() *Config {
 		}
 	}
 	dst.Home = *c.Home.Copy()
+	if c.OtherHome != nil {
+		dst.OtherHome = c.OtherHome.Copy()
+	}
+	dst.CreatedAt = c.CreatedAt
 	return dst
 }
 

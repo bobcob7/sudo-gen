@@ -62,6 +62,24 @@ func TestConfigApplyPartial_JobsSliceReplace(t *testing.T) {
 	}
 }
 
+func TestConfigApplyPartial_OtherHomeNestedStruct(t *testing.T) {
+	c := &Config{}
+	p := &ConfigPartial{OtherHome: &HomePartial{}}
+	c.ApplyPartial(p)
+	if c.OtherHome == nil {
+		t.Error("expected nested struct to be initialized")
+	}
+}
+
+func TestConfigApplyPartial_OtherHomeNestedStructExisting(t *testing.T) {
+	c := &Config{OtherHome: &Home{}}
+	p := &ConfigPartial{OtherHome: &HomePartial{}}
+	c.ApplyPartial(p)
+	if c.OtherHome == nil {
+		t.Error("expected nested struct to remain set")
+	}
+}
+
 func TestJobApplyPartialNil(t *testing.T) {
 	var c *Job
 	c.ApplyPartial(nil) // should not panic

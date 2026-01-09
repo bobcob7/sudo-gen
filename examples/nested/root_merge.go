@@ -16,6 +16,15 @@ func (c *Config) ApplyPartial(p *ConfigPartial) {
 	if p.Home != nil {
 		c.Home.ApplyPartial(p.Home)
 	}
+	if p.OtherHome != nil {
+		if c.OtherHome == nil {
+			c.OtherHome = &Home{}
+		}
+		c.OtherHome.ApplyPartial(p.OtherHome)
+	}
+	if p.CreatedAt != nil {
+		c.CreatedAt = *p.CreatedAt
+	}
 }
 
 func (c *Job) ApplyPartial(p *JobPartial) {

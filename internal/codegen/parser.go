@@ -6,6 +6,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -245,6 +246,7 @@ func FindTypeAfterLine(filename string, lineNum int) (string, error) {
 }
 
 // FindNestedStructs finds all struct types referenced by the given struct.
+// It searches all .go files in the directory to find nested types.
 func FindNestedStructs(dir, filename string, info *StructInfo) ([]*StructInfo, error) {
 	var nested []*StructInfo
 	seen := make(map[string]bool, len(info.Fields))
@@ -254,13 +256,13 @@ func FindNestedStructs(dir, filename string, info *StructInfo) ([]*StructInfo, e
 		if typeName == "" || field.TypePkg != "" || seen[typeName] {
 			continue
 		}
-		nestedInfo, err := ParseStruct(dir, filename, typeName)
+		nestedInfo, err := FindStructInPackage(dir, typeName)
 		if err != nil {
-			continue // Type might be in a different file
+			continue // Type might be external or not found
 		}
 		seen[typeName] = true
 		nested = append(nested, nestedInfo)
-		subNested, err := FindNestedStructs(dir, filename, nestedInfo)
+		subNested, err := FindNestedStructs(dir, "", nestedInfo)
 		if err == nil {
 			for _, sub := range subNested {
 				if !seen[sub.Name] {
@@ -271,6 +273,47 @@ func FindNestedStructs(dir, filename string, info *StructInfo) ([]*StructInfo, e
 		}
 	}
 	return nested, nil
+}
+
+// FindStructInPackage searches all .go files in the directory for a struct type.
+func FindStructInPackage(dir, typeName string) (*StructInfo, error) {
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, dir, func(fi os.FileInfo) bool {
+		return !strings.HasSuffix(fi.Name(), "_test.go")
+	}, parser.ParseComments)
+	if err != nil {
+		return nil, fmt.Errorf("parsing directory: %w", err)
+	}
+	for _, pkg := range pkgs {
+		for filename, f := range pkg.Files {
+			imports := collectImports(f)
+			for _, decl := range f.Decls {
+				genDecl, ok := decl.(*ast.GenDecl)
+				if !ok || genDecl.Tok != token.TYPE {
+					continue
+				}
+				for _, spec := range genDecl.Specs {
+					typeSpec, ok := spec.(*ast.TypeSpec)
+					if !ok || typeSpec.Name.Name != typeName {
+						continue
+					}
+					structType, ok := typeSpec.Type.(*ast.StructType)
+					if !ok {
+						continue
+					}
+					fields := parseStructFields(structType, imports)
+					return &StructInfo{
+						Name:    typeSpec.Name.Name,
+						Fields:  fields,
+						Imports: imports,
+						// Store which file the struct was found in
+						SourceFile: filepath.Base(filename),
+					}, nil
+				}
+			}
+		}
+	}
+	return nil, fmt.Errorf("type %s not found in package", typeName)
 }
 
 // CollectRequiredImports determines which imports are needed for generated code.
