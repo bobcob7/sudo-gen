@@ -4,6 +4,7 @@ import "time"
 
 //go:generate go run ../../cmd/sudo-gen merge
 //go:generate go run ../../cmd/sudo-gen copy
+//go:generate go run ../../cmd/sudo-gen manager
 type Config struct {
 	// Basic types
 	Name        string  `json:"name,omitempty"`

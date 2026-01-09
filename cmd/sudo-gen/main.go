@@ -35,6 +35,7 @@ import (
 
 	"github.com/bobcob7/merge-config/internal/codegen"
 	"github.com/bobcob7/merge-config/internal/codegen/copy"
+	"github.com/bobcob7/merge-config/internal/codegen/manager"
 	"github.com/bobcob7/merge-config/internal/codegen/merge"
 )
 
@@ -123,6 +124,9 @@ func runSubcommand(name string, cfg codegen.GeneratorConfig, methodName string) 
 	case "copy":
 		subtool := &copy.Subtool{MethodName: methodName}
 		return subtool.Run(cfg)
+	case "manager":
+		subtool := &manager.Subtool{}
+		return subtool.Run(cfg)
 	default:
 		return fmt.Errorf("unknown subcommand: %s", name)
 	}
@@ -138,6 +142,7 @@ Usage:
 Subcommands:
   merge    Generate partial types and ApplyPartial methods for config merging
   copy     Generate deep copy methods for structs
+  manager  Generate thread-safe manager with transactions and subscriptions
 
 Examples:
   //go:generate sudo-gen merge
@@ -163,6 +168,8 @@ Generated Files:
     {source}_merge.go    - ApplyPartial method for merging partials
   copy:
     {type}_copy.go       - Deep copy method for the struct
+  manager:
+    {source}_manager.go  - Thread-safe manager with Transaction() and Subscribe methods
 
 `)
 }
