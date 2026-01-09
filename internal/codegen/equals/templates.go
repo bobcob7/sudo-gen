@@ -69,7 +69,7 @@ func (c *{{.Name}}) {{$.MethodName}}(other *{{.Name}}) bool {
 {{- end}}
 	}
 {{- else if isLocalStruct .}}
-	if !c.{{.Name}}.{{$.MethodName}}(other.{{.Name}}) {
+	if !c.{{.Name}}.{{$.MethodName}}(&other.{{.Name}}) {
 		return false
 	}
 {{- else if eq .TypePkg "time"}}

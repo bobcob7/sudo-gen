@@ -61,9 +61,6 @@ func (c *{{.Name}}) ApplyPartial(p *{{partialType .Name}}) {
 	{{- end}}
 {{- else if needsConversion .}}
 	if p.{{.Name}} != nil {
-		if c.{{.Name}} == nil {
-			c.{{.Name}} = &{{.TypeName}}{}
-		}
 		c.{{.Name}}.ApplyPartial(p.{{.Name}})
 	}
 {{- else}}

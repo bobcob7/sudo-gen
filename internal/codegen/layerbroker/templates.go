@@ -202,7 +202,7 @@ func (l *{{layerType .TypeName}}) Set(p *{{.TypeName}}Partial) {
 	oldCfg := l.broker.config.Load()
 {{- range .Fields}}
 {{- if not (and .IsPointer (isLocalStruct .))}}
-	if old, new := oldCfg.{{.Name}}, newCfg.{{.Name}}; {{if .IsSlice}}!reflect.DeepEqual(old, new){{else if .IsMap}}!reflect.DeepEqual(old, new){{else if and .IsPointer (not (isLocalStruct .))}}(old == nil) != (new == nil) || (old != nil && *old != *new){{else if and (eq .TypePkg "time") (eq .TypeName "Time")}}!old.Equal(new){{else if isLocalStruct .}}!old.Equal(&new){{else}}old != new{{end}} {
+	if old, new := oldCfg.{{.Name}}, newCfg.{{.Name}}; !{{lower $.TypeName}}Equal{{.Name}}(old, new) {
 		for _, cb := range l.broker.subs{{.Name}} {
 			cb(new)
 		}
@@ -211,6 +211,51 @@ func (l *{{layerType .TypeName}}) Set(p *{{.TypeName}}Partial) {
 {{- end}}
 	l.broker.config.Store(newCfg)
 }
+
+{{- range .Fields}}
+{{- if not (and .IsPointer (isLocalStruct .))}}
+func {{lower $.TypeName}}Equal{{.Name}}(a, b {{.Type}}) bool {
+{{- if .IsSlice}}
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+{{- if and .StructTypeName (eq .TypePkg "")}}
+		if !a[i].Equal(&b[i]) {
+			return false
+		}
+{{- else}}
+		if a[i] != b[i] {
+			return false
+		}
+{{- end}}
+	}
+	return true
+{{- else if .IsMap}}
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || v != bv {
+			return false
+		}
+	}
+	return true
+{{- else if and .IsPointer (not (isLocalStruct .))}}
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	return a == nil || *a == *b
+{{- else if and (eq .TypePkg "time") (eq .TypeName "Time")}}
+	return a.Equal(b)
+{{- else if and .IsStruct (not .IsPointer)}}
+	return a.Equal(&b)
+{{- else}}
+	return a == b
+{{- end}}
+}
+{{- end}}
+{{- end}}
 
 // mergePartial merges the given partial into the layer's accumulated partial.
 func (l *{{layerType .TypeName}}) mergePartial(p *{{.TypeName}}Partial) {

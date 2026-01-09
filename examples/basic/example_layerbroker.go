@@ -73,7 +73,6 @@ package basic
 
 import (
 	"encoding/json"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -444,72 +443,149 @@ func (l *ConfigLayer) Set(p *ConfigPartial) {
 	l.mergePartial(p)
 	newCfg := l.broker.recompute()
 	oldCfg := l.broker.config.Load()
-	if old, new := oldCfg.Name, newCfg.Name; old != new {
+	if old, new := oldCfg.Name, newCfg.Name; !configEqualName(old, new) {
 		for _, cb := range l.broker.subsName {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Port, newCfg.Port; old != new {
+	if old, new := oldCfg.Port, newCfg.Port; !configEqualPort(old, new) {
 		for _, cb := range l.broker.subsPort {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.MaxRetries, newCfg.MaxRetries; old != new {
+	if old, new := oldCfg.MaxRetries, newCfg.MaxRetries; !configEqualMaxRetries(old, new) {
 		for _, cb := range l.broker.subsMaxRetries {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Timeout, newCfg.Timeout; old != new {
+	if old, new := oldCfg.Timeout, newCfg.Timeout; !configEqualTimeout(old, new) {
 		for _, cb := range l.broker.subsTimeout {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Rate, newCfg.Rate; old != new {
+	if old, new := oldCfg.Rate, newCfg.Rate; !configEqualRate(old, new) {
 		for _, cb := range l.broker.subsRate {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Enabled, newCfg.Enabled; old != new {
+	if old, new := oldCfg.Enabled, newCfg.Enabled; !configEqualEnabled(old, new) {
 		for _, cb := range l.broker.subsEnabled {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Description, newCfg.Description; (old == nil) != (new == nil) || (old != nil && *old != *new) {
+	if old, new := oldCfg.Description, newCfg.Description; !configEqualDescription(old, new) {
 		for _, cb := range l.broker.subsDescription {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Hosts, newCfg.Hosts; !reflect.DeepEqual(old, new) {
+	if old, new := oldCfg.Hosts, newCfg.Hosts; !configEqualHosts(old, new) {
 		for _, cb := range l.broker.subsHosts {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Tags, newCfg.Tags; !reflect.DeepEqual(old, new) {
+	if old, new := oldCfg.Tags, newCfg.Tags; !configEqualTags(old, new) {
 		for _, cb := range l.broker.subsTags {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Labels, newCfg.Labels; !reflect.DeepEqual(old, new) {
+	if old, new := oldCfg.Labels, newCfg.Labels; !configEqualLabels(old, new) {
 		for _, cb := range l.broker.subsLabels {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.Metadata, newCfg.Metadata; !reflect.DeepEqual(old, new) {
+	if old, new := oldCfg.Metadata, newCfg.Metadata; !configEqualMetadata(old, new) {
 		for _, cb := range l.broker.subsMetadata {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.CreatedAt, newCfg.CreatedAt; !old.Equal(new) {
+	if old, new := oldCfg.CreatedAt, newCfg.CreatedAt; !configEqualCreatedAt(old, new) {
 		for _, cb := range l.broker.subsCreatedAt {
 			cb(new)
 		}
 	}
-	if old, new := oldCfg.UpdatedAt, newCfg.UpdatedAt; (old == nil) != (new == nil) || (old != nil && *old != *new) {
+	if old, new := oldCfg.UpdatedAt, newCfg.UpdatedAt; !configEqualUpdatedAt(old, new) {
 		for _, cb := range l.broker.subsUpdatedAt {
 			cb(new)
 		}
 	}
 	l.broker.config.Store(newCfg)
+}
+func configEqualName(a, b string) bool {
+	return a == b
+}
+func configEqualPort(a, b int) bool {
+	return a == b
+}
+func configEqualMaxRetries(a, b int32) bool {
+	return a == b
+}
+func configEqualTimeout(a, b int64) bool {
+	return a == b
+}
+func configEqualRate(a, b float64) bool {
+	return a == b
+}
+func configEqualEnabled(a, b bool) bool {
+	return a == b
+}
+func configEqualDescription(a, b *string) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	return a == nil || *a == *b
+}
+func configEqualHosts(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+func configEqualTags(a, b []Tag) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if !a[i].Equal(&b[i]) {
+			return false
+		}
+	}
+	return true
+}
+func configEqualLabels(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || v != bv {
+			return false
+		}
+	}
+	return true
+}
+func configEqualMetadata(a, b map[string]any) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || v != bv {
+			return false
+		}
+	}
+	return true
+}
+func configEqualCreatedAt(a, b time.Time) bool {
+	return a.Equal(b)
+}
+func configEqualUpdatedAt(a, b *time.Time) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	return a == nil || *a == *b
 }
 
 // mergePartial merges the given partial into the layer's accumulated partial.

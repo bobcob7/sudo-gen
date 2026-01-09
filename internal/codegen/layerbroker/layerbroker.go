@@ -8,6 +8,7 @@ import (
 
 	"github.com/bobcob7/sudo-gen/internal/codegen"
 	"github.com/bobcob7/sudo-gen/internal/codegen/copy"
+	"github.com/bobcob7/sudo-gen/internal/codegen/equals"
 	"github.com/bobcob7/sudo-gen/internal/codegen/merge"
 )
 
@@ -23,7 +24,7 @@ func (s *Subtool) Description() string {
 }
 
 // Run executes the layerbroker code generation.
-// It automatically generates the required dependencies (merge and copy).
+// It automatically generates the required dependencies (merge, copy, and equals).
 func (s *Subtool) Run(cfg codegen.GeneratorConfig) error {
 	// Generate dependencies first
 	mergeTool := &merge.Subtool{}
@@ -33,6 +34,10 @@ func (s *Subtool) Run(cfg codegen.GeneratorConfig) error {
 	copyTool := &copy.Subtool{MethodName: "Copy"}
 	if err := copyTool.Run(cfg); err != nil {
 		return fmt.Errorf("generating copy dependency: %w", err)
+	}
+	equalsTool := &equals.Subtool{MethodName: "Equal"}
+	if err := equalsTool.Run(cfg); err != nil {
+		return fmt.Errorf("generating equals dependency: %w", err)
 	}
 	info, err := codegen.ParseStruct(cfg.SourceDir, cfg.SourceFile, cfg.TypeName)
 	if err != nil {
@@ -51,14 +56,9 @@ func generateLayerBrokerFile(cfg codegen.GeneratorConfig, info *codegen.StructIn
 	baseName := strings.TrimSuffix(cfg.SourceFile, ".go")
 	outputFile := filepath.Join(cfg.OutputDir, baseName+"_layerbroker.go")
 	needsTime := false
-	needsReflect := false
 	for _, f := range info.Fields {
 		if f.TypePkg == "time" {
 			needsTime = true
-		}
-		// Need reflect.DeepEqual for slices and maps
-		if f.IsSlice || f.IsMap {
-			needsReflect = true
 		}
 	}
 	data := templateData{
@@ -66,7 +66,7 @@ func generateLayerBrokerFile(cfg codegen.GeneratorConfig, info *codegen.StructIn
 		TypeName:           info.Name,
 		Fields:             info.Fields,
 		NeedsTimeImport:    needsTime,
-		NeedsReflectImport: needsReflect,
+		NeedsReflectImport: false, // No longer using reflect.DeepEqual
 		GenerateJSON:       cfg.GenerateJSON,
 	}
 	gen := codegen.NewTemplateGenerator(templateFuncs())
