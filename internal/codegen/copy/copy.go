@@ -303,13 +303,14 @@ func (g *generator) collectImportsFromType(expr ast.Expr, needed map[string]stri
 }
 
 func (g *generator) writeOutput(typeName string, data templateData) error {
-	outputFile := filepath.Join(g.cfg.OutputDir, strings.ToLower(typeName)+"_copy.go")
+	baseName := strings.TrimSuffix(g.cfg.SourceFile, ".go")
+	outputFile := filepath.Join(g.cfg.OutputDir, baseName+"_copy.go")
 	gen := codegen.NewTemplateGenerator(templateFuncs())
 	if err := gen.GenerateFile(outputFile, copyTemplate, data); err != nil {
 		return err
 	}
 	if g.cfg.GenerateTest {
-		testFile := filepath.Join(g.cfg.OutputDir, strings.ToLower(typeName)+"_copy_test.go")
+		testFile := filepath.Join(g.cfg.OutputDir, baseName+"_copy_test.go")
 		return gen.GenerateFile(testFile, copyTestTemplate, data)
 	}
 	return nil

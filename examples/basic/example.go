@@ -2,7 +2,7 @@ package basic
 
 import "time"
 
-//go:generate go run ../../cmd/sudo-gen layerbroker -tests -json
+//go:generate go run ../../../sudo-gen layerbroker -tests -json
 type Config struct {
 	// Basic types
 	Name        string  `json:"name,omitempty"`
