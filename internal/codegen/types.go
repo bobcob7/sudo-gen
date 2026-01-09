@@ -38,10 +38,12 @@ type ImportInfo struct {
 
 // GeneratorConfig holds common configuration for generators.
 type GeneratorConfig struct {
-	TypeName   string
-	SourceFile string
-	SourceDir  string
-	SourcePkg  string
-	OutputDir  string
-	OutputPkg  string
+	TypeName     string
+	SourceFile   string
+	SourceDir    string
+	SourcePkg    string
+	OutputDir    string
+	OutputPkg    string
+	GenerateTest bool
+	GenerateJSON bool // For layerbroker: generate JSON marshalling methods
 }

@@ -146,7 +146,7 @@ import (
 
 	"github.com/external/package"
 
-	"github.com/bobcob7/merge-config/internal/config"
+	"github.com/bobcob7/sudo-gen/internal/config"
 )
 ```
 

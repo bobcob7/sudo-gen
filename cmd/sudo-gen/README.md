@@ -1,17 +1,17 @@
 # sudo-gen
 
-A unified code generation tool for Go structs. Generate partial types, merge methods, and deep copy methods with a single command.
+A unified code generation tool for Go structs. Generate partial types, merge methods, deep copy methods, equality checks, and thread-safe layer brokers with a single command.
 
 ## Installation
 
 ```bash
-go install merge-config/cmd/sudo-gen@latest
+go install sudo-gen/cmd/sudo-gen@latest
 ```
 
 Or use directly with `go run`:
 
 ```go
-//go:generate go run github.com/yourorg/merge-config/cmd/sudo-gen merge
+//go:generate go run github.com/yourorg/sudo-gen/cmd/sudo-gen merge
 ```
 
 ## Subcommands
@@ -35,6 +35,57 @@ Generates deep copy methods for structs.
 
 **Use case:** Creating independent copies of complex nested structures without shared references.
 
+### equals
+
+Generates type-safe equality comparison methods for structs.
+
+**Generated files:**
+- `{source}_equals.go` - `Equal()` method for comparing two struct instances
+
+**Use case:** Comparing configuration objects for equality, detecting changes between versions.
+
+### layerbroker
+
+Generates a thread-safe configuration broker with ordered layers and field subscriptions. This is an all-in-one subcommand that automatically generates its dependencies (merge and copy).
+
+**Generated files:**
+- `{source}_partial.go` - Partial types (via merge)
+- `{source}_merge.go` - ApplyPartial methods (via merge)
+- `{type}_copy.go` - Copy methods (via copy)
+- `{source}_layerbroker.go` - Thread-safe LayerBroker with subscriptions
+
+**Use case:** Managing configuration from multiple ordered sources with real-time change notifications.
+
+**Example:**
+```go
+//go:generate go run sudo-gen/cmd/sudo-gen layerbroker -json
+type Config struct {
+    Name string `json:"name"`
+    Port int    `json:"port"`
+}
+```
+
+```go
+broker := NewConfigLayerBroker(&Config{Name: "default", Port: 8080})
+
+// Subscribe to field changes
+unsub := broker.SubscribeName(func(name string) {
+    fmt.Println("Name changed to:", name)
+})
+defer unsub()
+
+// Create layers for different config sources
+fileLayer := broker.Layer()
+envLayer := broker.Layer()
+
+// Updates from any layer trigger subscriber notifications
+fileLayer.Set(&ConfigPartial{Name: ptr("from-file")})
+envLayer.Set(&ConfigPartial{Port: ptr(9090)})
+
+// Get current merged config
+cfg := broker.Get() // Name="from-file", Port=9090
+```
+
 ## Usage
 
 ### Basic Usage
@@ -42,8 +93,8 @@ Generates deep copy methods for structs.
 Place the `go:generate` directive directly above your struct definition:
 
 ```go
-//go:generate go run merge-config/cmd/sudo-gen merge
-//go:generate go run merge-config/cmd/sudo-gen copy
+//go:generate go run sudo-gen/cmd/sudo-gen merge
+//go:generate go run sudo-gen/cmd/sudo-gen copy
 type Config struct {
     Name     string            `json:"name"`
     Port     int               `json:"port"`
@@ -63,14 +114,14 @@ go generate ./...
 If the directive is not directly above the struct, specify the type explicitly:
 
 ```go
-//go:generate go run merge-config/cmd/sudo-gen merge -type=Config
-//go:generate go run merge-config/cmd/sudo-gen copy -type=Config
+//go:generate go run sudo-gen/cmd/sudo-gen merge -type=Config
+//go:generate go run sudo-gen/cmd/sudo-gen copy -type=Config
 ```
 
 ### Custom Method Name (copy only)
 
 ```go
-//go:generate go run merge-config/cmd/sudo-gen copy -method=Clone
+//go:generate go run sudo-gen/cmd/sudo-gen copy -method=Clone
 ```
 
 This generates a `Clone()` method instead of `Copy()`.
@@ -82,7 +133,9 @@ This generates a `Clone()` method instead of `Copy()`.
 | `-type` | Name of the struct type | Auto-detected from directive position |
 | `-output` | Output directory for generated files | Same as source |
 | `-package` | Package name for generated files | Same as source |
-| `-method` | Name of the generated copy method (copy only) | `Copy` |
+| `-method` | Name of the generated method (copy/equals) | `Copy` / `Equal` |
+| `-tests` | Generate unit tests for the generated code | `false` |
+| `-json` | Generate JSON marshalling (layerbroker only) | `false` |
 | `-help` | Show help message | - |
 
 ## Generated Code Examples
@@ -223,7 +276,7 @@ Both subcommands support:
 The tool automatically detects the target type when the `go:generate` directive is placed directly above the struct:
 
 ```go
-//go:generate go run merge-config/cmd/sudo-gen merge
+//go:generate go run sudo-gen/cmd/sudo-gen merge
 type Config struct { // <-- This type is detected automatically
     ...
 }
@@ -264,6 +317,10 @@ internal/codegen/
 ├── generator.go      # Template generation utilities
 ├── merge/
 │   └── merge.go      # Merge-specific templates and logic
-└── copy/
-    └── copy.go       # Copy-specific templates and logic
+├── copy/
+│   └── copy.go       # Copy-specific templates and logic
+├── equals/
+│   └── equals.go     # Equals-specific templates and logic
+└── layerbroker/
+    └── layerbroker.go # LayerBroker templates (auto-generates merge & copy)
 ```

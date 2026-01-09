@@ -2,10 +2,7 @@ package basic
 
 import "time"
 
-//go:generate go run ../../cmd/sudo-gen merge
-//go:generate go run ../../cmd/sudo-gen copy
-//go:generate go run ../../cmd/sudo-gen equals
-//go:generate go run ../../cmd/sudo-gen manager
+//go:generate go run ../../cmd/sudo-gen layerbroker -tests -json
 type Config struct {
 	// Basic types
 	Name        string  `json:"name,omitempty"`

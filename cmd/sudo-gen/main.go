@@ -33,11 +33,11 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/bobcob7/merge-config/internal/codegen"
-	"github.com/bobcob7/merge-config/internal/codegen/copy"
-	"github.com/bobcob7/merge-config/internal/codegen/equals"
-	"github.com/bobcob7/merge-config/internal/codegen/manager"
-	"github.com/bobcob7/merge-config/internal/codegen/merge"
+	"github.com/bobcob7/sudo-gen/internal/codegen"
+	"github.com/bobcob7/sudo-gen/internal/codegen/copy"
+	"github.com/bobcob7/sudo-gen/internal/codegen/equals"
+	"github.com/bobcob7/sudo-gen/internal/codegen/layerbroker"
+	"github.com/bobcob7/sudo-gen/internal/codegen/merge"
 )
 
 func main() {
@@ -52,15 +52,19 @@ func main() {
 	}
 	os.Args = append(os.Args[:1], os.Args[2:]...)
 	var (
-		typeName   string
-		outputDir  string
-		pkgName    string
-		methodName string
+		typeName     string
+		outputDir    string
+		pkgName      string
+		methodName   string
+		generateTest bool
+		generateJSON bool
 	)
 	flag.StringVar(&typeName, "type", "", "Name of the struct type (inferred if directive is above the type)")
 	flag.StringVar(&outputDir, "output", "", "Output directory for generated files (default: same as source)")
 	flag.StringVar(&pkgName, "package", "", "Package name for generated files (default: same as source)")
 	flag.StringVar(&methodName, "method", "Copy", "For copy: name of the generated copy method")
+	flag.BoolVar(&generateTest, "tests", false, "Generate unit tests for the generated code")
+	flag.BoolVar(&generateJSON, "json", false, "For layerbroker: generate JSON marshalling with layer state")
 	flag.Parse()
 	sourceFile := os.Getenv("GOFILE")
 	if sourceFile == "" {
@@ -88,12 +92,14 @@ func main() {
 		pkgName = sourcePkg
 	}
 	cfg := codegen.GeneratorConfig{
-		TypeName:   typeName,
-		SourceFile: sourceFile,
-		SourceDir:  sourceDir,
-		SourcePkg:  sourcePkg,
-		OutputDir:  outputDir,
-		OutputPkg:  pkgName,
+		TypeName:     typeName,
+		SourceFile:   sourceFile,
+		SourceDir:    sourceDir,
+		SourcePkg:    sourcePkg,
+		OutputDir:    outputDir,
+		OutputPkg:    pkgName,
+		GenerateTest: generateTest,
+		GenerateJSON: generateJSON,
 	}
 	if err := runSubcommand(subcommand, cfg, methodName); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -125,8 +131,8 @@ func runSubcommand(name string, cfg codegen.GeneratorConfig, methodName string) 
 	case "copy":
 		subtool := &copy.Subtool{MethodName: methodName}
 		return subtool.Run(cfg)
-	case "manager":
-		subtool := &manager.Subtool{}
+	case "layerbroker":
+		subtool := &layerbroker.Subtool{}
 		return subtool.Run(cfg)
 	case "equals":
 		eqMethodName := methodName
@@ -148,10 +154,10 @@ Usage:
   type Config struct { ... }
 
 Subcommands:
-  merge    Generate partial types and ApplyPartial methods for config merging
-  copy     Generate deep copy methods for structs
-  equals   Generate type-safe equality comparison methods for structs
-  manager  Generate thread-safe manager with transactions and subscriptions
+  merge        Generate partial types and ApplyPartial methods for config merging
+  copy         Generate deep copy methods for structs
+  equals       Generate type-safe equality comparison methods for structs
+  layerbroker  Generate thread-safe LayerBroker with ordered layers and subscriptions
 
 Examples:
   //go:generate sudo-gen merge
@@ -170,19 +176,23 @@ Flags:
         Package name for generated files (default: same as source)
   -method string
         For copy: name of the generated copy method (default: Copy)
+  -tests
+        Generate unit tests for the generated code
+  -json
+        For layerbroker: generate JSON marshalling with layer state
   -help
         Show this help message
 
 Generated Files:
   merge:
-    {source}_partial.go  - Partial version of the type with pointer fields
-    {source}_merge.go    - ApplyPartial method for merging partials
+    {source}_partial.go      - Partial version of the type with pointer fields
+    {source}_merge.go        - ApplyPartial method for merging partials
   copy:
-    {type}_copy.go       - Deep copy method for the struct
+    {type}_copy.go           - Deep copy method for the struct
   equals:
-    {source}_equals.go   - Type-safe Equal method for the struct
-  manager:
-    {source}_manager.go  - Thread-safe manager with Transaction() and Subscribe methods
+    {source}_equals.go       - Type-safe Equal method for the struct
+  layerbroker:
+    {source}_layerbroker.go  - Thread-safe LayerBroker with Layer() and Subscribe methods
 
 `)
 }

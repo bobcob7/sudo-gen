@@ -1,52 +1,102 @@
-# Merge Config
+# sudo-gen
 
-A Go toolkit for type-safe configuration merging and deep copying. This project provides code generation tools that create partial types and merge/copy methods for your structs.
+A collection of Go code generators for struct boilerplate. Generate deep copy methods, partial types for merging, equality comparisons, and thread-safe configuration brokers - all without reflection at runtime.
 
 ## Overview
 
-This project was inspired by an issue I encountered at work. I needed a framework for managing flexible configs that could merge and persist from multiple sources.
+sudo-gen provides four code generators that eliminate common struct boilerplate:
 
-The solution includes:
-- **sudo-gen**: A unified code generation tool with subcommands for generating merge and copy functionality
-- **Playgrounds**: Experiments comparing different approaches to object merging in Go
+| Generator | What it generates |
+|-----------|-------------------|
+| `copy` | Type-safe deep copy methods |
+| `merge` | Partial types and `ApplyPartial` methods for config merging |
+| `equals` | Type-safe equality comparison methods |
+| `layerbroker` | Thread-safe config broker with ordered layers and field subscriptions |
 
-## Quick Start
+## Installation
+
+```bash
+go install github.com/bobcob7/sudo-gen/cmd/sudo-gen@latest
+```
+
+Or add it as a tool dependency in your project:
+
+```bash
+go get github.com/bobcob7/sudo-gen/cmd/sudo-gen
+```
+
+## Usage
+
+Add a `go:generate` directive above your struct definition:
 
 ```go
 package config
 
-//go:generate go run merge-config/cmd/sudo-gen merge
-//go:generate go run merge-config/cmd/sudo-gen copy
+//go:generate sudo-gen copy
 type Config struct {
-    Name     string            `json:"name"`
-    Port     int               `json:"port"`
-    Database *DatabaseConfig   `json:"database"`
-    Labels   map[string]string `json:"labels"`
+    Name     string
+    Database *DatabaseConfig
 }
 
 type DatabaseConfig struct {
-    Host string `json:"host"`
-    Port int    `json:"port"`
+    Host string
+    Port int
 }
 ```
 
-Run `go generate ./...` to generate:
-- `config_partial.go` - Partial types with pointer fields
-- `config_merge.go` - `ApplyPartial` methods for merging
-- `config_copy.go` - `Copy` methods for deep copying
+Run code generation:
 
-## Tools
+```bash
+go generate ./...
+```
 
-### [sudo-gen](cmd/sudo-gen/README.md)
+Each generator produces specific output files. See [Generators](#generators) below for details.
 
-Unified code generation tool with two subcommands:
+## Generators
 
-| Subcommand | Description | Generated Files |
-|------------|-------------|-----------------|
-| `merge` | Generate partial types and ApplyPartial methods | `*_partial.go`, `*_merge.go` |
-| `copy` | Generate deep copy methods | `*_copy.go` |
+### copy
 
-See the [sudo-gen README](cmd/sudo-gen/README.md) for detailed usage and examples.
+Generates deep copy methods for structs.
+
+```go
+//go:generate sudo-gen copy
+```
+
+**Output:** `*_copy.go`
+
+### merge
+
+Generates partial types with pointer fields and `ApplyPartial` methods for merging configs.
+
+```go
+//go:generate sudo-gen merge
+```
+
+**Output:** `*_partial.go`, `*_merge.go`
+
+### equals
+
+Generates type-safe equality comparison methods.
+
+```go
+//go:generate sudo-gen equals
+```
+
+**Output:** `*_equals.go`
+
+### layerbroker
+
+Generates a thread-safe configuration broker with ordered layers and per-field subscriptions. Includes merge and copy output.
+
+```go
+//go:generate sudo-gen layerbroker
+```
+
+**Output:** `*_layerbroker.go`, `*_partial.go`, `*_merge.go`, `*_copy.go`
+
+---
+
+See the [sudo-gen command documentation](cmd/sudo-gen/README.md) for all flags and advanced usage.
 
 ## Use Cases
 
@@ -84,24 +134,12 @@ copied.Database.Host = "remote" // doesn't affect original
 ├── internal/
 │   └── codegen/           # Shared code generation logic
 │       ├── merge/         # Merge-specific templates
-│       └── copy/          # Copy-specific templates
+│       ├── copy/          # Copy-specific templates
+│       ├── equals/        # Equals-specific templates
+│       └── layerbroker/   # LayerBroker templates
 ├── examples/
 │   └── basic/             # Example usage with generated code
-└── playgrounds/
-    └── merge-objects/     # Benchmarks comparing merge strategies
 ```
-
-## Benchmarks
-
-The `playgrounds/merge-objects` directory contains benchmarks comparing different merge strategies:
-
-| Method | Performance | Use Case |
-|--------|-------------|----------|
-| Manual | Fastest | Production code |
-| Reflection | Moderate | Generic utilities |
-| JSON | Slowest | Simple prototyping |
-
-See [playgrounds/merge-objects/results.md](playgrounds/merge-objects/results.md) for detailed benchmark results.
 
 ## Requirements
 
