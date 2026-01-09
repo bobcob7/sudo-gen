@@ -3,16 +3,29 @@
 package basic
 
 import (
-	"reflect"
 	"sync"
 	"time"
 )
 
 // ConfigManager provides thread-safe access to Config with change subscriptions.
 type ConfigManager struct {
-	mu          sync.RWMutex
-	config      *Config
-	subscribers map[string][]any
+	mu              sync.RWMutex
+	config          *Config
+	nextSubID       int
+	subsName        map[int]func(string)
+	subsPort        map[int]func(int)
+	subsMaxRetries  map[int]func(int32)
+	subsTimeout     map[int]func(int64)
+	subsRate        map[int]func(float64)
+	subsEnabled     map[int]func(bool)
+	subsDescription map[int]func(*string)
+	subsHosts       map[int]func([]string)
+	subsTags        map[int]func([]Tag)
+	subsLabels      map[int]func(map[string]string)
+	subsMetadata    map[int]func(map[string]any)
+	subsDatabase    map[int]func(*DatabaseConfig)
+	subsCreatedAt   map[int]func(time.Time)
+	subsUpdatedAt   map[int]func(*time.Time)
 }
 
 // NewConfigManager creates a new manager wrapping the given config.
@@ -22,8 +35,21 @@ func NewConfigManager(cfg *Config) *ConfigManager {
 		cfg = &Config{}
 	}
 	return &ConfigManager{
-		config:      cfg.Copy(),
-		subscribers: make(map[string][]any),
+		config:          cfg.Copy(),
+		subsName:        make(map[int]func(string)),
+		subsPort:        make(map[int]func(int)),
+		subsMaxRetries:  make(map[int]func(int32)),
+		subsTimeout:     make(map[int]func(int64)),
+		subsRate:        make(map[int]func(float64)),
+		subsEnabled:     make(map[int]func(bool)),
+		subsDescription: make(map[int]func(*string)),
+		subsHosts:       make(map[int]func([]string)),
+		subsTags:        make(map[int]func([]Tag)),
+		subsLabels:      make(map[int]func(map[string]string)),
+		subsMetadata:    make(map[int]func(map[string]any)),
+		subsDatabase:    make(map[int]func(*DatabaseConfig)),
+		subsCreatedAt:   make(map[int]func(time.Time)),
+		subsUpdatedAt:   make(map[int]func(*time.Time)),
 	}
 }
 
@@ -42,269 +68,284 @@ func (m *ConfigManager) Transaction() *ConfigTransaction {
 	}
 }
 
-// Path constants for subscriptions.
-const (
-	ConfigPathName             = "Name"
-	ConfigPathPort             = "Port"
-	ConfigPathMaxRetries       = "MaxRetries"
-	ConfigPathTimeout          = "Timeout"
-	ConfigPathRate             = "Rate"
-	ConfigPathEnabled          = "Enabled"
-	ConfigPathDescription      = "Description"
-	ConfigPathHosts            = "Hosts"
-	ConfigPathTags             = "Tags"
-	ConfigPathLabels           = "Labels"
-	ConfigPathMetadata         = "Metadata"
-	ConfigPathDatabase         = "Database"
-	ConfigPathDatabaseHost     = "Database.Host"
-	ConfigPathDatabasePort     = "Database.Port"
-	ConfigPathDatabaseUsername = "Database.Username"
-	ConfigPathDatabasePassword = "Database.Password"
-	ConfigPathDatabaseSSLMode  = "Database.SSLMode"
-	ConfigPathCreatedAt        = "CreatedAt"
-	ConfigPathUpdatedAt        = "UpdatedAt"
-)
-
 // SubscribeName subscribes to changes on Name.
-// The callback is invoked immediately if the value is set, and on future changes.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
 // Returns an unsubscribe function.
 func (m *ConfigManager) SubscribeName(callback func(string)) func() {
-	return m.subscribe(ConfigPathName, callback)
-}
-
-// SubscribePort subscribes to changes on Port.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribePort(callback func(int)) func() {
-	return m.subscribe(ConfigPathPort, callback)
-}
-
-// SubscribeMaxRetries subscribes to changes on MaxRetries.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeMaxRetries(callback func(int32)) func() {
-	return m.subscribe(ConfigPathMaxRetries, callback)
-}
-
-// SubscribeTimeout subscribes to changes on Timeout.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeTimeout(callback func(int64)) func() {
-	return m.subscribe(ConfigPathTimeout, callback)
-}
-
-// SubscribeRate subscribes to changes on Rate.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeRate(callback func(float64)) func() {
-	return m.subscribe(ConfigPathRate, callback)
-}
-
-// SubscribeEnabled subscribes to changes on Enabled.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeEnabled(callback func(bool)) func() {
-	return m.subscribe(ConfigPathEnabled, callback)
-}
-
-// SubscribeDescription subscribes to changes on Description.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeDescription(callback func(*string)) func() {
-	return m.subscribe(ConfigPathDescription, callback)
-}
-
-// SubscribeHosts subscribes to changes on Hosts.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeHosts(callback func([]string)) func() {
-	return m.subscribe(ConfigPathHosts, callback)
-}
-
-// SubscribeTags subscribes to changes on Tags.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeTags(callback func([]Tag)) func() {
-	return m.subscribe(ConfigPathTags, callback)
-}
-
-// SubscribeLabels subscribes to changes on Labels.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeLabels(callback func(map[string]string)) func() {
-	return m.subscribe(ConfigPathLabels, callback)
-}
-
-// SubscribeMetadata subscribes to changes on Metadata.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeMetadata(callback func(map[string]any)) func() {
-	return m.subscribe(ConfigPathMetadata, callback)
-}
-
-// SubscribeDatabase subscribes to changes on Database.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeDatabase(callback func(*DatabaseConfig)) func() {
-	return m.subscribe(ConfigPathDatabase, callback)
-}
-
-// SubscribeDatabaseHost subscribes to changes on Database.Host.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeDatabaseHost(callback func(string)) func() {
-	return m.subscribe(ConfigPathDatabaseHost, callback)
-}
-
-// SubscribeDatabasePort subscribes to changes on Database.Port.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeDatabasePort(callback func(int)) func() {
-	return m.subscribe(ConfigPathDatabasePort, callback)
-}
-
-// SubscribeDatabaseUsername subscribes to changes on Database.Username.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeDatabaseUsername(callback func(string)) func() {
-	return m.subscribe(ConfigPathDatabaseUsername, callback)
-}
-
-// SubscribeDatabasePassword subscribes to changes on Database.Password.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeDatabasePassword(callback func(string)) func() {
-	return m.subscribe(ConfigPathDatabasePassword, callback)
-}
-
-// SubscribeDatabaseSSLMode subscribes to changes on Database.SSLMode.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeDatabaseSSLMode(callback func(string)) func() {
-	return m.subscribe(ConfigPathDatabaseSSLMode, callback)
-}
-
-// SubscribeCreatedAt subscribes to changes on CreatedAt.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeCreatedAt(callback func(time.Time)) func() {
-	return m.subscribe(ConfigPathCreatedAt, callback)
-}
-
-// SubscribeUpdatedAt subscribes to changes on UpdatedAt.
-// The callback is invoked immediately if the value is set, and on future changes.
-// Returns an unsubscribe function.
-func (m *ConfigManager) SubscribeUpdatedAt(callback func(*time.Time)) func() {
-	return m.subscribe(ConfigPathUpdatedAt, callback)
-}
-
-// Subscribe registers a callback for the given path.
-// The callback type must match the field type at the path.
-// Returns an unsubscribe function.
-func (m *ConfigManager) Subscribe(path string, callback any) func() {
-	return m.subscribe(path, callback)
-}
-
-func (m *ConfigManager) subscribe(path string, callback any) func() {
 	m.mu.Lock()
-	m.subscribers[path] = append(m.subscribers[path], callback)
-	currentValue := m.getValueAtPath(path)
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsName[id] = callback
+	v := m.config.Name
 	m.mu.Unlock()
-	if !isZeroValue(currentValue) {
-		invokeCallback(callback, currentValue)
+	if v != "" {
+		callback(v)
 	}
 	return func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
-		subs := m.subscribers[path]
-		for i, sub := range subs {
-			if reflect.ValueOf(sub).Pointer() == reflect.ValueOf(callback).Pointer() {
-				m.subscribers[path] = append(subs[:i], subs[i+1:]...)
-				break
-			}
-		}
+		delete(m.subsName, id)
 	}
 }
 
-func (m *ConfigManager) getValueAtPath(path string) any {
-	switch path {
-	case ConfigPathName:
-		return m.config.Name
-	case ConfigPathPort:
-		return m.config.Port
-	case ConfigPathMaxRetries:
-		return m.config.MaxRetries
-	case ConfigPathTimeout:
-		return m.config.Timeout
-	case ConfigPathRate:
-		return m.config.Rate
-	case ConfigPathEnabled:
-		return m.config.Enabled
-	case ConfigPathDescription:
-		return m.config.Description
-	case ConfigPathHosts:
-		return m.config.Hosts
-	case ConfigPathTags:
-		return m.config.Tags
-	case ConfigPathLabels:
-		return m.config.Labels
-	case ConfigPathMetadata:
-		return m.config.Metadata
-	case ConfigPathDatabase:
-		return m.config.Database
-	case ConfigPathDatabaseHost:
-		if m.config.Database == nil {
-			return ""
-		}
-		return m.config.Database.Host
-	case ConfigPathDatabasePort:
-		if m.config.Database == nil {
-			return 0
-		}
-		return m.config.Database.Port
-	case ConfigPathDatabaseUsername:
-		if m.config.Database == nil {
-			return ""
-		}
-		return m.config.Database.Username
-	case ConfigPathDatabasePassword:
-		if m.config.Database == nil {
-			return ""
-		}
-		return m.config.Database.Password
-	case ConfigPathDatabaseSSLMode:
-		if m.config.Database == nil {
-			return ""
-		}
-		return m.config.Database.SSLMode
-	case ConfigPathCreatedAt:
-		return m.config.CreatedAt
-	case ConfigPathUpdatedAt:
-		return m.config.UpdatedAt
+// SubscribePort subscribes to changes on Port.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribePort(callback func(int)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsPort[id] = callback
+	v := m.config.Port
+	m.mu.Unlock()
+	if v != 0 {
+		callback(v)
 	}
-	return nil
-}
-
-func (m *ConfigManager) notifySubscribers(path string, value any) {
-	for _, callback := range m.subscribers[path] {
-		invokeCallback(callback, value)
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsPort, id)
 	}
 }
 
-func invokeCallback(callback any, value any) {
-	reflect.ValueOf(callback).Call([]reflect.Value{reflect.ValueOf(value)})
+// SubscribeMaxRetries subscribes to changes on MaxRetries.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeMaxRetries(callback func(int32)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsMaxRetries[id] = callback
+	v := m.config.MaxRetries
+	m.mu.Unlock()
+	if v != 0 {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsMaxRetries, id)
+	}
 }
 
-func isZeroValue(v any) bool {
-	if v == nil {
-		return true
+// SubscribeTimeout subscribes to changes on Timeout.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeTimeout(callback func(int64)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsTimeout[id] = callback
+	v := m.config.Timeout
+	m.mu.Unlock()
+	if v != 0 {
+		callback(v)
 	}
-	rv := reflect.ValueOf(v)
-	switch rv.Kind() {
-	case reflect.Ptr, reflect.Slice, reflect.Map, reflect.Interface:
-		return rv.IsNil()
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsTimeout, id)
 	}
-	return reflect.DeepEqual(v, reflect.Zero(reflect.TypeOf(v)).Interface())
+}
+
+// SubscribeRate subscribes to changes on Rate.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeRate(callback func(float64)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsRate[id] = callback
+	v := m.config.Rate
+	m.mu.Unlock()
+	if v != 0 {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsRate, id)
+	}
+}
+
+// SubscribeEnabled subscribes to changes on Enabled.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeEnabled(callback func(bool)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsEnabled[id] = callback
+	v := m.config.Enabled
+	m.mu.Unlock()
+	if v {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsEnabled, id)
+	}
+}
+
+// SubscribeDescription subscribes to changes on Description.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeDescription(callback func(*string)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsDescription[id] = callback
+	v := m.config.Description
+	m.mu.Unlock()
+	if v != nil {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsDescription, id)
+	}
+}
+
+// SubscribeHosts subscribes to changes on Hosts.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeHosts(callback func([]string)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsHosts[id] = callback
+	v := m.config.Hosts
+	m.mu.Unlock()
+	if v != nil {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsHosts, id)
+	}
+}
+
+// SubscribeTags subscribes to changes on Tags.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeTags(callback func([]Tag)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsTags[id] = callback
+	v := m.config.Tags
+	m.mu.Unlock()
+	if v != nil {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsTags, id)
+	}
+}
+
+// SubscribeLabels subscribes to changes on Labels.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeLabels(callback func(map[string]string)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsLabels[id] = callback
+	v := m.config.Labels
+	m.mu.Unlock()
+	if v != nil {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsLabels, id)
+	}
+}
+
+// SubscribeMetadata subscribes to changes on Metadata.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeMetadata(callback func(map[string]any)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsMetadata[id] = callback
+	v := m.config.Metadata
+	m.mu.Unlock()
+	if v != nil {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsMetadata, id)
+	}
+}
+
+// SubscribeDatabase subscribes to changes on Database.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeDatabase(callback func(*DatabaseConfig)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsDatabase[id] = callback
+	v := m.config.Database
+	m.mu.Unlock()
+	if v != nil {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsDatabase, id)
+	}
+}
+
+// SubscribeCreatedAt subscribes to changes on CreatedAt.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeCreatedAt(callback func(time.Time)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsCreatedAt[id] = callback
+	v := m.config.CreatedAt
+	m.mu.Unlock()
+	if !v.IsZero() {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsCreatedAt, id)
+	}
+}
+
+// SubscribeUpdatedAt subscribes to changes on UpdatedAt.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (m *ConfigManager) SubscribeUpdatedAt(callback func(*time.Time)) func() {
+	m.mu.Lock()
+	id := m.nextSubID
+	m.nextSubID++
+	m.subsUpdatedAt[id] = callback
+	v := m.config.UpdatedAt
+	m.mu.Unlock()
+	if v != nil {
+		callback(v)
+	}
+	return func() {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.subsUpdatedAt, id)
+	}
 }
 
 // ConfigTransaction holds pending changes to be applied.
@@ -379,51 +420,6 @@ func (t *ConfigTransaction) SetMetadata(v map[string]any) *ConfigTransaction {
 	return t
 }
 
-// SetDatabaseHost sets Database.Host in this transaction.
-func (t *ConfigTransaction) SetDatabaseHost(v string) *ConfigTransaction {
-	if t.partial.Database == nil {
-		t.partial.Database = &DatabaseConfigPartial{}
-	}
-	t.partial.Database.Host = &v
-	return t
-}
-
-// SetDatabasePort sets Database.Port in this transaction.
-func (t *ConfigTransaction) SetDatabasePort(v int) *ConfigTransaction {
-	if t.partial.Database == nil {
-		t.partial.Database = &DatabaseConfigPartial{}
-	}
-	t.partial.Database.Port = &v
-	return t
-}
-
-// SetDatabaseUsername sets Database.Username in this transaction.
-func (t *ConfigTransaction) SetDatabaseUsername(v string) *ConfigTransaction {
-	if t.partial.Database == nil {
-		t.partial.Database = &DatabaseConfigPartial{}
-	}
-	t.partial.Database.Username = &v
-	return t
-}
-
-// SetDatabasePassword sets Database.Password in this transaction.
-func (t *ConfigTransaction) SetDatabasePassword(v string) *ConfigTransaction {
-	if t.partial.Database == nil {
-		t.partial.Database = &DatabaseConfigPartial{}
-	}
-	t.partial.Database.Password = &v
-	return t
-}
-
-// SetDatabaseSSLMode sets Database.SSLMode in this transaction.
-func (t *ConfigTransaction) SetDatabaseSSLMode(v string) *ConfigTransaction {
-	if t.partial.Database == nil {
-		t.partial.Database = &DatabaseConfigPartial{}
-	}
-	t.partial.Database.SSLMode = &v
-	return t
-}
-
 // SetCreatedAt sets CreatedAt in this transaction.
 func (t *ConfigTransaction) SetCreatedAt(v time.Time) *ConfigTransaction {
 	t.partial.CreatedAt = &v
@@ -437,22 +433,361 @@ func (t *ConfigTransaction) SetUpdatedAt(v *time.Time) *ConfigTransaction {
 }
 
 // Commit applies all changes and notifies subscribers.
-// Returns the paths that were changed.
+// Returns the fields that were changed.
 func (t *ConfigTransaction) Commit() []string {
 	t.manager.mu.Lock()
 	defer t.manager.mu.Unlock()
-	oldValues := make(map[string]any, len(t.manager.subscribers))
-	for path := range t.manager.subscribers {
-		oldValues[path] = t.manager.getValueAtPath(path)
-	}
-	t.manager.config.ApplyPartial(t.partial)
+
 	var changed []string
-	for path, oldVal := range oldValues {
-		newVal := t.manager.getValueAtPath(path)
-		if !reflect.DeepEqual(oldVal, newVal) {
-			changed = append(changed, path)
-			t.manager.notifySubscribers(path, newVal)
+
+	// Check Name
+	if t.partial.Name != nil {
+		oldName := t.manager.config.Name
+		t.manager.config.Name = *t.partial.Name
+		newName := t.manager.config.Name
+		if !ConfigequalName(oldName, newName) {
+			changed = append(changed, "Name")
+			for _, cb := range t.manager.subsName {
+				cb(newName)
+			}
 		}
 	}
+
+	// Check Port
+	if t.partial.Port != nil {
+		oldPort := t.manager.config.Port
+		t.manager.config.Port = *t.partial.Port
+		newPort := t.manager.config.Port
+		if !ConfigequalPort(oldPort, newPort) {
+			changed = append(changed, "Port")
+			for _, cb := range t.manager.subsPort {
+				cb(newPort)
+			}
+		}
+	}
+
+	// Check MaxRetries
+	if t.partial.MaxRetries != nil {
+		oldMaxRetries := t.manager.config.MaxRetries
+		t.manager.config.MaxRetries = *t.partial.MaxRetries
+		newMaxRetries := t.manager.config.MaxRetries
+		if !ConfigequalMaxRetries(oldMaxRetries, newMaxRetries) {
+			changed = append(changed, "MaxRetries")
+			for _, cb := range t.manager.subsMaxRetries {
+				cb(newMaxRetries)
+			}
+		}
+	}
+
+	// Check Timeout
+	if t.partial.Timeout != nil {
+		oldTimeout := t.manager.config.Timeout
+		t.manager.config.Timeout = *t.partial.Timeout
+		newTimeout := t.manager.config.Timeout
+		if !ConfigequalTimeout(oldTimeout, newTimeout) {
+			changed = append(changed, "Timeout")
+			for _, cb := range t.manager.subsTimeout {
+				cb(newTimeout)
+			}
+		}
+	}
+
+	// Check Rate
+	if t.partial.Rate != nil {
+		oldRate := t.manager.config.Rate
+		t.manager.config.Rate = *t.partial.Rate
+		newRate := t.manager.config.Rate
+		if !ConfigequalRate(oldRate, newRate) {
+			changed = append(changed, "Rate")
+			for _, cb := range t.manager.subsRate {
+				cb(newRate)
+			}
+		}
+	}
+
+	// Check Enabled
+	if t.partial.Enabled != nil {
+		oldEnabled := t.manager.config.Enabled
+		t.manager.config.Enabled = *t.partial.Enabled
+		newEnabled := t.manager.config.Enabled
+		if !ConfigequalEnabled(oldEnabled, newEnabled) {
+			changed = append(changed, "Enabled")
+			for _, cb := range t.manager.subsEnabled {
+				cb(newEnabled)
+			}
+		}
+	}
+
+	// Check Description
+	if t.partial.Description != nil {
+		oldDescription := t.manager.config.Description
+		t.manager.config.Description = t.partial.Description
+		newDescription := t.manager.config.Description
+		if !ConfigequalDescription(oldDescription, newDescription) {
+			changed = append(changed, "Description")
+			for _, cb := range t.manager.subsDescription {
+				cb(newDescription)
+			}
+		}
+	}
+
+	// Check Hosts
+	if t.partial.Hosts != nil {
+		oldHosts := t.manager.config.Hosts
+		t.manager.config.Hosts = t.partial.Hosts
+		newHosts := t.manager.config.Hosts
+		if !ConfigequalHosts(oldHosts, newHosts) {
+			changed = append(changed, "Hosts")
+			for _, cb := range t.manager.subsHosts {
+				cb(newHosts)
+			}
+		}
+	}
+
+	// Check Tags
+	if t.partial.Tags != nil {
+		oldTags := t.manager.config.Tags
+		t.manager.config.Tags = t.partial.Tags
+		newTags := t.manager.config.Tags
+		if !ConfigequalTags(oldTags, newTags) {
+			changed = append(changed, "Tags")
+			for _, cb := range t.manager.subsTags {
+				cb(newTags)
+			}
+		}
+	}
+
+	// Check Labels
+	if t.partial.Labels != nil {
+		oldLabels := t.manager.config.Labels
+		t.manager.config.Labels = t.partial.Labels
+		newLabels := t.manager.config.Labels
+		if !ConfigequalLabels(oldLabels, newLabels) {
+			changed = append(changed, "Labels")
+			for _, cb := range t.manager.subsLabels {
+				cb(newLabels)
+			}
+		}
+	}
+
+	// Check Metadata
+	if t.partial.Metadata != nil {
+		oldMetadata := t.manager.config.Metadata
+		t.manager.config.Metadata = t.partial.Metadata
+		newMetadata := t.manager.config.Metadata
+		if !ConfigequalMetadata(oldMetadata, newMetadata) {
+			changed = append(changed, "Metadata")
+			for _, cb := range t.manager.subsMetadata {
+				cb(newMetadata)
+			}
+		}
+	}
+
+	// Check CreatedAt
+	if t.partial.CreatedAt != nil {
+		oldCreatedAt := t.manager.config.CreatedAt
+		t.manager.config.CreatedAt = *t.partial.CreatedAt
+		newCreatedAt := t.manager.config.CreatedAt
+		if !ConfigequalCreatedAt(oldCreatedAt, newCreatedAt) {
+			changed = append(changed, "CreatedAt")
+			for _, cb := range t.manager.subsCreatedAt {
+				cb(newCreatedAt)
+			}
+		}
+	}
+
+	// Check UpdatedAt
+	if t.partial.UpdatedAt != nil {
+		oldUpdatedAt := t.manager.config.UpdatedAt
+		t.manager.config.UpdatedAt = t.partial.UpdatedAt
+		newUpdatedAt := t.manager.config.UpdatedAt
+		if !ConfigequalUpdatedAt(oldUpdatedAt, newUpdatedAt) {
+			changed = append(changed, "UpdatedAt")
+			for _, cb := range t.manager.subsUpdatedAt {
+				cb(newUpdatedAt)
+			}
+		}
+	}
+
 	return changed
+}
+
+func ConfigequalName(old, new string) bool {
+	return old == new
+}
+
+func ConfigequalPort(old, new int) bool {
+	return old == new
+}
+
+func ConfigequalMaxRetries(old, new int32) bool {
+	return old == new
+}
+
+func ConfigequalTimeout(old, new int64) bool {
+	return old == new
+}
+
+func ConfigequalRate(old, new float64) bool {
+	return old == new
+}
+
+func ConfigequalEnabled(old, new bool) bool {
+	return old == new
+}
+
+func ConfigequalDescription(old, new *string) bool {
+	if old == nil && new == nil {
+		return true
+	}
+	if old == nil || new == nil {
+		return false
+	}
+	return *old == *new
+}
+
+func ConfigequalHosts(old, new []string) bool {
+	if len(old) != len(new) {
+		return false
+	}
+	for i := range old {
+		if old[i] != new[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func ConfigequalTags(old, new []Tag) bool {
+	if len(old) != len(new) {
+		return false
+	}
+	for i := range old {
+		if !old[i].Equal(&new[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func ConfigequalLabels(old, new map[string]string) bool {
+	if len(old) != len(new) {
+		return false
+	}
+	for k, v := range old {
+		ov, ok := new[k]
+		if !ok {
+			return false
+		}
+		if v != ov {
+			return false
+		}
+	}
+	return true
+}
+
+func ConfigequalMetadata(old, new map[string]any) bool {
+	if len(old) != len(new) {
+		return false
+	}
+	for k, v := range old {
+		ov, ok := new[k]
+		if !ok {
+			return false
+		}
+		if !ConfigEqualAny(v, ov) {
+			return false
+		}
+	}
+	return true
+}
+
+func ConfigequalDatabase(old, new DatabaseConfig) bool {
+	return old.Equal(&new)
+}
+
+func ConfigequalCreatedAt(old, new time.Time) bool {
+	return old.Equal(new)
+}
+
+func ConfigequalUpdatedAt(old, new *time.Time) bool {
+	if old == nil && new == nil {
+		return true
+	}
+	if old == nil || new == nil {
+		return false
+	}
+	return old.Equal(*new)
+}
+
+func ConfigEqualAny(a, b any) bool {
+	if a == nil && b == nil {
+		return true
+	}
+	if a == nil || b == nil {
+		return false
+	}
+	switch av := a.(type) {
+	case map[string]any:
+		bv, ok := b.(map[string]any)
+		if !ok || len(av) != len(bv) {
+			return false
+		}
+		for k, v := range av {
+			if ov, ok := bv[k]; !ok || !ConfigEqualAny(v, ov) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		bv, ok := b.([]any)
+		if !ok || len(av) != len(bv) {
+			return false
+		}
+		for i := range av {
+			if !ConfigEqualAny(av[i], bv[i]) {
+				return false
+			}
+		}
+		return true
+	case []string:
+		bv, ok := b.([]string)
+		if !ok || len(av) != len(bv) {
+			return false
+		}
+		for i := range av {
+			if av[i] != bv[i] {
+				return false
+			}
+		}
+		return true
+	case []int:
+		bv, ok := b.([]int)
+		if !ok || len(av) != len(bv) {
+			return false
+		}
+		for i := range av {
+			if av[i] != bv[i] {
+				return false
+			}
+		}
+		return true
+	case string:
+		bv, ok := b.(string)
+		return ok && av == bv
+	case int:
+		bv, ok := b.(int)
+		return ok && av == bv
+	case int64:
+		bv, ok := b.(int64)
+		return ok && av == bv
+	case float64:
+		bv, ok := b.(float64)
+		return ok && av == bv
+	case bool:
+		bv, ok := b.(bool)
+		return ok && av == bv
+	default:
+		return a == b
+	}
 }

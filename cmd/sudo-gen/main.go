@@ -35,6 +35,7 @@ import (
 
 	"github.com/bobcob7/merge-config/internal/codegen"
 	"github.com/bobcob7/merge-config/internal/codegen/copy"
+	"github.com/bobcob7/merge-config/internal/codegen/equals"
 	"github.com/bobcob7/merge-config/internal/codegen/manager"
 	"github.com/bobcob7/merge-config/internal/codegen/merge"
 )
@@ -127,6 +128,13 @@ func runSubcommand(name string, cfg codegen.GeneratorConfig, methodName string) 
 	case "manager":
 		subtool := &manager.Subtool{}
 		return subtool.Run(cfg)
+	case "equals":
+		eqMethodName := methodName
+		if eqMethodName == "Copy" {
+			eqMethodName = "Equal"
+		}
+		subtool := &equals.Subtool{MethodName: eqMethodName}
+		return subtool.Run(cfg)
 	default:
 		return fmt.Errorf("unknown subcommand: %s", name)
 	}
@@ -142,13 +150,16 @@ Usage:
 Subcommands:
   merge    Generate partial types and ApplyPartial methods for config merging
   copy     Generate deep copy methods for structs
+  equals   Generate type-safe equality comparison methods for structs
   manager  Generate thread-safe manager with transactions and subscriptions
 
 Examples:
   //go:generate sudo-gen merge
   //go:generate sudo-gen copy
+  //go:generate sudo-gen equals
   //go:generate sudo-gen merge -type=Config
   //go:generate sudo-gen copy -method=Clone
+  //go:generate sudo-gen equals -method=Equals
 
 Flags:
   -type string
@@ -168,6 +179,8 @@ Generated Files:
     {source}_merge.go    - ApplyPartial method for merging partials
   copy:
     {type}_copy.go       - Deep copy method for the struct
+  equals:
+    {source}_equals.go   - Type-safe Equal method for the struct
   manager:
     {source}_manager.go  - Thread-safe manager with Transaction() and Subscribe methods
 
