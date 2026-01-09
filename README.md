@@ -16,13 +16,13 @@ sudo-gen provides four code generators that eliminate common struct boilerplate:
 ## Installation
 
 ```bash
-go install github.com/bobcob7/sudo-gen/cmd/sudo-gen@latest
+go install github.com/bobcob7/sudo-gen@latest
 ```
 
 Or add it as a tool dependency in your project:
 
 ```bash
-go get github.com/bobcob7/sudo-gen/cmd/sudo-gen
+go get github.com/bobcob7/sudo-gen
 ```
 
 ## Usage
@@ -96,7 +96,7 @@ Generates a thread-safe configuration broker with ordered layers and per-field s
 
 ---
 
-See the [sudo-gen command documentation](cmd/sudo-gen/README.md) for all flags and advanced usage.
+Run `sudo-gen -help` for all flags and advanced usage.
 
 ## Use Cases
 
@@ -129,8 +129,7 @@ copied.Database.Host = "remote" // doesn't affect original
 
 ```
 .
-├── cmd/
-│   └── sudo-gen/          # Unified code generation tool
+├── main.go                # Code generation tool entrypoint
 ├── internal/
 │   └── codegen/           # Shared code generation logic
 │       ├── merge/         # Merge-specific templates
