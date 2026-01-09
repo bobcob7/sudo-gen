@@ -146,7 +146,7 @@ import (
 
 	"github.com/external/package"
 
-	"merge-config/internal/config"
+	"github.com/bobcob7/merge-config/internal/config"
 )
 ```
 

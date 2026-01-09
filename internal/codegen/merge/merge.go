@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/template"
 
-	"merge-config/internal/codegen"
+	"github.com/bobcob7/merge-config/internal/codegen"
 )
 
 // Subtool implements the merge code generator.

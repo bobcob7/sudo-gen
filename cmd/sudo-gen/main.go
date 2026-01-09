@@ -33,9 +33,9 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"merge-config/internal/codegen"
-	"merge-config/internal/codegen/copy"
-	"merge-config/internal/codegen/merge"
+	"github.com/bobcob7/merge-config/internal/codegen"
+	"github.com/bobcob7/merge-config/internal/codegen/copy"
+	"github.com/bobcob7/merge-config/internal/codegen/merge"
 )
 
 func main() {

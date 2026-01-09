@@ -1,4 +1,4 @@
-module merge-config
+module github.com/bobcob7/merge-config
 
 go 1.25.5
 
