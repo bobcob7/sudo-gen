@@ -29,6 +29,9 @@ func (c *Config) ApplyPartial(p *ConfigPartial) {
 	if p.CreatedAt != nil {
 		c.CreatedAt = *p.CreatedAt
 	}
+	if p.Limit != nil {
+		applyDurationTimestampPartial(&c.Limit, p.Limit)
+	}
 }
 
 func (c *Job) ApplyPartial(p *JobPartial) {
@@ -50,6 +53,12 @@ func (c *Job) ApplyPartial(p *JobPartial) {
 		}
 		applyDurationTimestampPartial(c.Tenure, p.Tenure)
 	}
+	if p.Coords != nil {
+		if c.Coords == nil {
+			c.Coords = &Coordinates{}
+		}
+		c.Coords.ApplyPartial(p.Coords)
+	}
 }
 
 // applyDurationTimestampPartial applies a partial update to a duration.Timestamp.
@@ -68,6 +77,18 @@ func applyDurationTimestampPartial(c *duration.Timestamp, p *DurationTimestampPa
 	}
 }
 
+func (c *Coordinates) ApplyPartial(p *CoordinatesPartial) {
+	if c == nil || p == nil {
+		return
+	}
+	if p.Latitude != nil {
+		c.Latitude = *p.Latitude
+	}
+	if p.Longitude != nil {
+		c.Longitude = *p.Longitude
+	}
+}
+
 func (c *Home) ApplyPartial(p *HomePartial) {
 	if c == nil || p == nil {
 		return
@@ -83,5 +104,14 @@ func (c *Home) ApplyPartial(p *HomePartial) {
 	}
 	if p.Age != nil {
 		c.Age = *p.Age
+	}
+	if p.Coords != nil {
+		c.Coords.ApplyPartial(p.Coords)
+	}
+	if p.Destination != nil {
+		if c.Destination == nil {
+			c.Destination = &Coordinates{}
+		}
+		c.Destination.ApplyPartial(p.Destination)
 	}
 }

@@ -56,6 +56,8 @@ func generateLayerBrokerFile(cfg codegen.GeneratorConfig, info *codegen.StructIn
 	baseName := strings.TrimSuffix(cfg.SourceFile, ".go")
 	outputFile := filepath.Join(cfg.OutputDir, baseName+"_layerbroker.go")
 	needsTime := false
+	// Collect external package imports (excluding "time" which is handled separately)
+	externalImports := collectExternalImports(info)
 	for _, f := range info.Fields {
 		if f.TypePkg == "time" {
 			needsTime = true
@@ -68,9 +70,39 @@ func generateLayerBrokerFile(cfg codegen.GeneratorConfig, info *codegen.StructIn
 		NeedsTimeImport:    needsTime,
 		NeedsReflectImport: false, // No longer using reflect.DeepEqual
 		GenerateJSON:       cfg.GenerateJSON,
+		ExternalImports:    externalImports,
 	}
 	gen := codegen.NewTemplateGenerator(templateFuncs())
 	return gen.GenerateFile(outputFile, layerBrokerTemplate, data)
+}
+
+// collectExternalImports gathers imports for external packages used by fields.
+func collectExternalImports(info *codegen.StructInfo) []codegen.ImportInfo {
+	// Build a map of package name to import info
+	importMap := make(map[string]codegen.ImportInfo)
+	for _, imp := range info.Imports {
+		pkgName := imp.Alias
+		if pkgName == "" {
+			pkgName = filepath.Base(imp.Path)
+		}
+		importMap[pkgName] = imp
+	}
+
+	// Find which external packages are used by fields (excluding "time")
+	usedPkgs := make(map[string]bool)
+	for _, f := range info.Fields {
+		if f.TypePkg != "" && f.TypePkg != "time" {
+			usedPkgs[f.TypePkg] = true
+		}
+	}
+
+	var imports []codegen.ImportInfo
+	for pkgName := range usedPkgs {
+		if imp, ok := importMap[pkgName]; ok {
+			imports = append(imports, imp)
+		}
+	}
+	return imports
 }
 
 type templateData struct {
@@ -80,6 +112,7 @@ type templateData struct {
 	NeedsTimeImport    bool
 	NeedsReflectImport bool
 	GenerateJSON       bool
+	ExternalImports    []codegen.ImportInfo
 }
 
 func templateFuncs() template.FuncMap {

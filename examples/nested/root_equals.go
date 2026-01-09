@@ -30,6 +30,9 @@ func (c *Config) Equal(other *Config) bool {
 	if !c.CreatedAt.Equal(other.CreatedAt) {
 		return false
 	}
+	if c.Limit != other.Limit {
+		return false
+	}
 	return true
 }
 
@@ -56,6 +59,26 @@ func (c *Job) Equal(other *Job) bool {
 	if c.Tenure != nil && *c.Tenure != *other.Tenure {
 		return false
 	}
+	if !c.Coords.Equal(other.Coords) {
+		return false
+	}
+	return true
+}
+
+// Equal returns true if c and other have the same values.
+func (c *Coordinates) Equal(other *Coordinates) bool {
+	if c == other {
+		return true
+	}
+	if c == nil || other == nil {
+		return false
+	}
+	if c.Latitude != other.Latitude {
+		return false
+	}
+	if c.Longitude != other.Longitude {
+		return false
+	}
 	return true
 }
 
@@ -77,6 +100,12 @@ func (c *Home) Equal(other *Home) bool {
 		return false
 	}
 	if c.Age != other.Age {
+		return false
+	}
+	if !c.Coords.Equal(&other.Coords) {
+		return false
+	}
+	if !c.Destination.Equal(other.Destination) {
 		return false
 	}
 	return true

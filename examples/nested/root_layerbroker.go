@@ -73,6 +73,7 @@ package nested
 
 import (
 	"encoding/json"
+	"github.com/bobcob7/sudo-gen/examples/nested/duration"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -90,6 +91,7 @@ type ConfigLayerBroker struct {
 	subsHome      map[int]func(Home)
 	subsOtherHome map[int]func(*Home)
 	subsCreatedAt map[int]func(time.Time)
+	subsLimit     map[int]func(duration.Timestamp)
 }
 
 // NewConfigLayerBroker creates a new LayerBroker wrapping the given config.
@@ -105,6 +107,7 @@ func NewConfigLayerBroker(cfg *Config) *ConfigLayerBroker {
 		subsHome:      make(map[int]func(Home)),
 		subsOtherHome: make(map[int]func(*Home)),
 		subsCreatedAt: make(map[int]func(time.Time)),
+		subsLimit:     make(map[int]func(duration.Timestamp)),
 	}
 	b.config.Store(cfg.Copy())
 	return b
@@ -223,6 +226,24 @@ func (b *ConfigLayerBroker) SubscribeCreatedAt(callback func(time.Time)) func() 
 	}
 }
 
+// SubscribeLimit subscribes to changes on Limit.
+// The callback is invoked immediately if the value is non-zero, and on future changes.
+// Returns an unsubscribe function.
+func (b *ConfigLayerBroker) SubscribeLimit(callback func(duration.Timestamp)) func() {
+	b.mu.Lock()
+	id := b.nextSubID
+	b.nextSubID++
+	b.subsLimit[id] = callback
+	v := b.config.Load().Limit
+	b.mu.Unlock()
+	callback(v)
+	return func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		delete(b.subsLimit, id)
+	}
+}
+
 // ConfigLayer applies partial updates to the LayerBroker.
 type ConfigLayer struct {
 	broker  *ConfigLayerBroker
@@ -263,6 +284,11 @@ func (l *ConfigLayer) Set(p *ConfigPartial) {
 			cb(new)
 		}
 	}
+	if old, new := oldCfg.Limit, newCfg.Limit; !configEqualLimit(old, new) {
+		for _, cb := range l.broker.subsLimit {
+			cb(new)
+		}
+	}
 	l.broker.config.Store(newCfg)
 }
 func configEqualName(a, b string) bool {
@@ -285,6 +311,9 @@ func configEqualHome(a, b Home) bool {
 func configEqualCreatedAt(a, b time.Time) bool {
 	return a.Equal(b)
 }
+func configEqualLimit(a, b duration.Timestamp) bool {
+	return a == b
+}
 
 // mergePartial merges the given partial into the layer's accumulated partial.
 func (l *ConfigLayer) mergePartial(p *ConfigPartial) {
@@ -302,6 +331,9 @@ func (l *ConfigLayer) mergePartial(p *ConfigPartial) {
 	}
 	if p.CreatedAt != nil {
 		l.partial.CreatedAt = p.CreatedAt
+	}
+	if p.Limit != nil {
+		l.partial.Limit = p.Limit
 	}
 }
 

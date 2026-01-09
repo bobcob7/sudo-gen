@@ -72,6 +72,39 @@ func TestJobEqualEmptyStructs(t *testing.T) {
 	}
 }
 
+func TestCoordinatesEqualBothNil(t *testing.T) {
+	var a, b *Coordinates
+	if !a.Equal(b) {
+		t.Error("two nil pointers should be equal")
+	}
+}
+
+func TestCoordinatesEqualOneNil(t *testing.T) {
+	a := &Coordinates{}
+	var b *Coordinates
+	if a.Equal(b) {
+		t.Error("non-nil should not equal nil")
+	}
+	if b.Equal(a) {
+		t.Error("nil should not equal non-nil")
+	}
+}
+
+func TestCoordinatesEqualSamePointer(t *testing.T) {
+	a := &Coordinates{}
+	if !a.Equal(a) {
+		t.Error("same pointer should be equal to itself")
+	}
+}
+
+func TestCoordinatesEqualEmptyStructs(t *testing.T) {
+	a := &Coordinates{}
+	b := &Coordinates{}
+	if !a.Equal(b) {
+		t.Error("two empty structs should be equal")
+	}
+}
+
 func TestHomeEqualBothNil(t *testing.T) {
 	var a, b *Home
 	if !a.Equal(b) {

@@ -251,6 +251,9 @@ func (g *generator) collectNestedTypes(fields []fieldInfo) ([]templateData, erro
 		}
 		data.IsNestedType = true
 		nested = append(nested, data)
+		// Flatten: also add nested types from this type
+		nested = append(nested, data.NestedTypes...)
+		data.NestedTypes = nil // Clear to avoid duplication in template
 	}
 	return nested, nil
 }

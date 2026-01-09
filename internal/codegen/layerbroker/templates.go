@@ -85,6 +85,9 @@ import (
 {{- if .NeedsTimeImport}}
 	"time"
 {{- end}}
+{{- range .ExternalImports}}
+	{{if .Alias}}{{.Alias}} {{end}}"{{.Path}}"
+{{- end}}
 )
 
 // {{brokerType .TypeName}} provides thread-safe access to {{.TypeName}} with ordered layer updates and subscriptions.
@@ -248,7 +251,7 @@ func {{lower $.TypeName}}Equal{{.Name}}(a, b {{.Type}}) bool {
 	return a == nil || *a == *b
 {{- else if and (eq .TypePkg "time") (eq .TypeName "Time")}}
 	return a.Equal(b)
-{{- else if and .IsStruct (not .IsPointer)}}
+{{- else if and .IsStruct (not .IsPointer) (eq .TypePkg "")}}
 	return a.Equal(&b)
 {{- else}}
 	return a == b

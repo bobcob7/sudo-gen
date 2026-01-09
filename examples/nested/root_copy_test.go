@@ -117,6 +117,25 @@ func TestJobCopyEmpty(t *testing.T) {
 	}
 }
 
+func TestCoordinatesCopyNil(t *testing.T) {
+	var c *Coordinates
+	got := c.Copy()
+	if got != nil {
+		t.Errorf("expected nil, got %v", got)
+	}
+}
+
+func TestCoordinatesCopyEmpty(t *testing.T) {
+	c := &Coordinates{}
+	got := c.Copy()
+	if got == nil {
+		t.Fatal("expected non-nil copy")
+	}
+	if got == c {
+		t.Error("copy should be a different pointer")
+	}
+}
+
 func TestHomeCopyNil(t *testing.T) {
 	var c *Home
 	got := c.Copy()

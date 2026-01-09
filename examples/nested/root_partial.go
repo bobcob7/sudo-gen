@@ -8,11 +8,12 @@ import (
 )
 
 type ConfigPartial struct {
-	Name      *string      `json:"name,omitempty"`
-	Jobs      []Job        `json:"jobs,omitempty"`
-	Home      *HomePartial `json:"home,omitempty"`
-	OtherHome *HomePartial `json:"home,omitempty"`
-	CreatedAt *time.Time   `json:"created_at,omitempty"`
+	Name      *string                   `json:"name,omitempty"`
+	Jobs      []Job                     `json:"jobs,omitempty"`
+	Home      *HomePartial              `json:"home,omitempty"`
+	OtherHome *HomePartial              `json:"home,omitempty"`
+	CreatedAt *time.Time                `json:"created_at,omitempty"`
+	Limit     *DurationTimestampPartial `json:"limit,omitempty"`
 }
 
 type JobPartial struct {
@@ -20,6 +21,7 @@ type JobPartial struct {
 	Company  *string                   `json:"company,omitempty"`
 	Location *string                   `json:"location,omitempty"`
 	Tenure   *DurationTimestampPartial `json:"tenure,omitempty"`
+	Coords   *CoordinatesPartial       `json:"coords,omitempty"`
 }
 
 type DurationTimestampPartial struct {
@@ -28,9 +30,16 @@ type DurationTimestampPartial struct {
 	Days    *int `json:"days,omitempty"`
 }
 
+type CoordinatesPartial struct {
+	Latitude  *float64 `json:"latitude,omitempty"`
+	Longitude *float64 `json:"longitude,omitempty"`
+}
+
 type HomePartial struct {
-	Address *string `json:"address,omitempty"`
-	City    *string `json:"city,omitempty"`
-	ZipCode *string `json:"zip_code,omitempty"`
-	Age     *duration.Duration
+	Address     *string `json:"address,omitempty"`
+	City        *string `json:"city,omitempty"`
+	ZipCode     *string `json:"zip_code,omitempty"`
+	Age         *duration.Duration
+	Coords      *CoordinatesPartial `json:"coords,omitempty"`
+	Destination *CoordinatesPartial `json:"destination,omitempty"`
 }

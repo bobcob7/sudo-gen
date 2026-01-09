@@ -148,6 +148,56 @@ func TestJobApplyPartial_LocationOverwrite(t *testing.T) {
 	}
 }
 
+func TestJobApplyPartial_CoordsNestedStruct(t *testing.T) {
+	c := &Job{}
+	p := &JobPartial{Coords: &CoordinatesPartial{}}
+	c.ApplyPartial(p)
+	if c.Coords == nil {
+		t.Error("expected nested struct to be initialized")
+	}
+}
+
+func TestJobApplyPartial_CoordsNestedStructExisting(t *testing.T) {
+	c := &Job{Coords: &Coordinates{}}
+	p := &JobPartial{Coords: &CoordinatesPartial{}}
+	c.ApplyPartial(p)
+	if c.Coords == nil {
+		t.Error("expected nested struct to remain set")
+	}
+}
+
+func TestCoordinatesApplyPartialNil(t *testing.T) {
+	var c *Coordinates
+	c.ApplyPartial(nil) // should not panic
+
+	c = &Coordinates{}
+	c.ApplyPartial(nil) // should not panic
+}
+
+func TestCoordinatesApplyPartialEmpty(t *testing.T) {
+	c := &Coordinates{}
+	p := &CoordinatesPartial{}
+	c.ApplyPartial(p) // should not panic or change anything
+}
+
+func TestCoordinatesApplyPartial_Latitude(t *testing.T) {
+	c := &Coordinates{}
+	p := &CoordinatesPartial{Latitude: mergePtr(float64(42))}
+	c.ApplyPartial(p)
+	if c.Latitude != 42 {
+		t.Errorf("expected Latitude=42, got %v", c.Latitude)
+	}
+}
+
+func TestCoordinatesApplyPartial_Longitude(t *testing.T) {
+	c := &Coordinates{}
+	p := &CoordinatesPartial{Longitude: mergePtr(float64(42))}
+	c.ApplyPartial(p)
+	if c.Longitude != 42 {
+		t.Errorf("expected Longitude=42, got %v", c.Longitude)
+	}
+}
+
 func TestHomeApplyPartialNil(t *testing.T) {
 	var c *Home
 	c.ApplyPartial(nil) // should not panic
@@ -213,5 +263,23 @@ func TestHomeApplyPartial_ZipCodeOverwrite(t *testing.T) {
 	c.ApplyPartial(p)
 	if c.ZipCode != "updated" {
 		t.Errorf("expected ZipCode=updated, got %s", c.ZipCode)
+	}
+}
+
+func TestHomeApplyPartial_DestinationNestedStruct(t *testing.T) {
+	c := &Home{}
+	p := &HomePartial{Destination: &CoordinatesPartial{}}
+	c.ApplyPartial(p)
+	if c.Destination == nil {
+		t.Error("expected nested struct to be initialized")
+	}
+}
+
+func TestHomeApplyPartial_DestinationNestedStructExisting(t *testing.T) {
+	c := &Home{Destination: &Coordinates{}}
+	p := &HomePartial{Destination: &CoordinatesPartial{}}
+	c.ApplyPartial(p)
+	if c.Destination == nil {
+		t.Error("expected nested struct to remain set")
 	}
 }

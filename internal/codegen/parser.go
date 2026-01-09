@@ -249,9 +249,14 @@ func FindTypeAfterLine(filename string, lineNum int) (string, error) {
 // It searches all .go files in the directory to find nested types.
 // It also finds external package structs and marks them appropriately.
 func FindNestedStructs(dir, filename string, info *StructInfo) ([]*StructInfo, error) {
-	var nested []*StructInfo
-	seen := make(map[string]bool, len(info.Fields))
+	seen := make(map[string]bool)
 	seen[info.Name] = true
+	return findNestedStructsRecursive(dir, info, seen)
+}
+
+// findNestedStructsRecursive is the internal recursive implementation that tracks seen types.
+func findNestedStructsRecursive(dir string, info *StructInfo, seen map[string]bool) ([]*StructInfo, error) {
+	var nested []*StructInfo
 
 	// Build import path map from all collected imports
 	importPaths := make(map[string]string)
@@ -272,14 +277,9 @@ func FindNestedStructs(dir, filename string, info *StructInfo) ([]*StructInfo, e
 			}
 			seen[field.StructTypeName] = true
 			nested = append(nested, nestedInfo)
-			subNested, err := FindNestedStructs(dir, "", nestedInfo)
+			subNested, err := findNestedStructsRecursive(dir, nestedInfo, seen)
 			if err == nil {
-				for _, sub := range subNested {
-					if !seen[sub.Name] {
-						seen[sub.Name] = true
-						nested = append(nested, sub)
-					}
-				}
+				nested = append(nested, subNested...)
 			}
 			continue
 		}

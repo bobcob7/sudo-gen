@@ -20,6 +20,7 @@ func (c *Config) Copy() *Config {
 		dst.OtherHome = c.OtherHome.Copy()
 	}
 	dst.CreatedAt = c.CreatedAt
+	dst.Limit = c.Limit
 	return dst
 }
 
@@ -35,6 +36,19 @@ func (c *Job) Copy() *Job {
 		v := *c.Tenure
 		dst.Tenure = &v
 	}
+	if c.Coords != nil {
+		dst.Coords = c.Coords.Copy()
+	}
+	return dst
+}
+
+func (c *Coordinates) Copy() *Coordinates {
+	if c == nil {
+		return nil
+	}
+	dst := &Coordinates{}
+	dst.Latitude = c.Latitude
+	dst.Longitude = c.Longitude
 	return dst
 }
 
@@ -47,5 +61,9 @@ func (c *Home) Copy() *Home {
 	dst.City = c.City
 	dst.ZipCode = c.ZipCode
 	dst.Age = c.Age
+	dst.Coords = *c.Coords.Copy()
+	if c.Destination != nil {
+		dst.Destination = c.Destination.Copy()
+	}
 	return dst
 }
